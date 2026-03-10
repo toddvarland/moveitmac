@@ -35,7 +35,9 @@ struct SidebarView: View {
                         .font(.caption)
                 } else {
                     ForEach(appState.obstacles) { obstacle in
-                        ObstacleRow(obstacle: obstacle)
+                        ObstacleRow(obstacle: obstacle) {
+                            appState.obstacles.removeAll { $0.id == obstacle.id }
+                        }
                     }
                     .onDelete { indices in
                         appState.obstacles.remove(atOffsets: indices)
@@ -67,10 +69,19 @@ struct SidebarView: View {
 
 private struct ObstacleRow: View {
     let obstacle: Obstacle
+    let onDelete: () -> Void
 
     var body: some View {
-        Label(obstacle.name, systemImage: obstacle.shape.systemImage)
-            .font(.caption)
+        HStack {
+            Label(obstacle.name, systemImage: obstacle.shape.systemImage)
+                .font(.caption)
+            Spacer()
+            Button(action: onDelete) {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
