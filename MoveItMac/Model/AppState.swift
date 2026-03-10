@@ -97,6 +97,16 @@ final class AppState: ObservableObject {
     /// set of colliding links actually changes (cheap equality guard).
     @Published var collisionResult: CollisionResult = .clear
 
+    // ── IK ────────────────────────────────────────────────────────────────
+    /// Whether the IK gizmo is active. When true, the timer runs IKSolver
+    /// instead of letting the sliders drive joint angles directly.
+    @Published var useIK: Bool = false
+    /// The link that the IK solver should try to place at `ikTarget`.
+    @Published var ikEndEffectorLink: String = ""
+    /// Desired world-frame end-effector pose (URDF/ROS Z-up frame).
+    /// Written by the gizmo drag handler; read by the 120 Hz timer.
+    var ikTarget: simd_double4x4 = .identity
+
     // MARK: - Actions
 
     /// Opens a file-open panel and loads the selected URDF.
@@ -137,5 +147,26 @@ final class AppState: ObservableObject {
                     dict[joint.name] = 0
                 }
             }
+        // Default end-effector = last link in BFS order
+        let bfsLinks: [String] = {
+            var result: [String] = [model.rootLinkName]
+            var queue = [model.rootLinkName]
+            while !queue.isEmpty {
+                let cur = queue.removeFirst()
+                let children = model.joints.values
+                    .filter { $0.parentLinkName == cur }
+                    .sorted { $0.name < $1.name }
+                    .map { $0.childLinkName }
+                result.append(contentsOf: children)
+                queue.append(contentsOf: children)
+            }
+            return result
+        }()
+        ikEndEffectorLink = bfsLinks.last ?? model.rootLinkName
+        // Seed IK target from the current FK pose
+        if let fk = fkResult {
+            ikTarget = fk.transform(for: ikEndEffectorLink)
+        }
+        useIK = false
     }
 }

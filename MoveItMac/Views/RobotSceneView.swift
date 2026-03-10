@@ -27,8 +27,20 @@ struct RobotSceneView: NSViewRepresentable {
         sv.delegate = context.coordinator
 
         context.coordinator.appState = appState
+        context.coordinator.scnView  = sv
 
-        // ── 120 Hz main-thread timer ──────────────────────────────────────
+        // Mouse handlers for IK gizmo drag.
+        // We use NSEvent local monitors so we don't need the view to be first responder.
+        let coord = context.coordinator
+        NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak coord] event in
+            coord?.handleMouseDown(event: event); return event
+        }
+        NSEvent.addLocalMonitorForEvents(matching: .leftMouseDragged) { [weak coord] event in
+            coord?.handleMouseDrag(event: event); return event
+        }
+        NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak coord] event in
+            coord?.handleMouseUp(event: event); return event
+        }
         // Runs in .common mode so it fires even during AppKit event-tracking
         // (sustained slider drag). All SceneKit writes happen here — on the
         // MAIN thread — so no locking, no BG-thread scene-graph races, and
@@ -56,6 +68,22 @@ struct RobotSceneView: NSViewRepresentable {
                 c.lastCollisionPublishTime = now
             }
 
+            // IK solve — runs every tick when IK mode is active.
+            // Writes directly to state.jointAngles (plain var, no objectWillChange).
+            if state.useIK,
+               let model = state.robotModel,
+               !state.ikEndEffectorLink.isEmpty {
+                let result = IKSolver.solve(
+                    model: model,
+                    endEffectorLinkName: state.ikEndEffectorLink,
+                    targetTransform: state.ikTarget,
+                    initialAngles: state.jointAngles,
+                    maxIterations: 20,   // low per-tick budget; iterates across frames
+                    tolerance: 1e-3
+                )
+                state.jointAngles = result.jointAngles
+            }
+
             c.snapshotLock.lock()
             c.snapshotAngles          = state.jointAngles
             c.snapshotObstacles       = state.obstacles
@@ -63,6 +91,9 @@ struct RobotSceneView: NSViewRepresentable {
             c.snapshotModel           = state.robotModel
             c.snapshotURDFDir         = state.urdfURL?.deletingLastPathComponent()
             c.snapshotCollisionResult = collision
+            c.snapshotUseIK           = state.useIK
+            c.snapshotIKTarget        = state.ikTarget
+            c.snapshotIKLink          = state.ikEndEffectorLink
             c.snapshotLock.unlock()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -150,10 +181,28 @@ struct RobotSceneView: NSViewRepresentable {
         var snapshotModel:           RobotModel? = nil
         var snapshotURDFDir:         URL? = nil
         var snapshotCollisionResult: CollisionResult = .clear
+        var snapshotUseIK:           Bool = false
+        var snapshotIKTarget:        simd_double4x4 = .identity
+        var snapshotIKLink:          String = ""
 
         // ── Logging / throttle tracking ─────────────────────────────────────────
         var lastLogTime:             Date = .distantPast
         var lastCollisionPublishTime: Date = .distantPast
+
+        // ── IK gizmo state ────────────────────────────────────────────────────
+        // The gizmo is three axis-arrows anchored at the end-effector.
+        // Each arrow is an SCNNode named "gizmo:x", "gizmo:y", "gizmo:z".
+        // Dragging an arrow translates the IK target in that axis direction.
+        private var gizmoNode: SCNNode?
+        private var gizmoVisible: Bool = false
+        /// Which axis the user is currently dragging: 0=x, 1=y, 2=z, -1=none
+        private var draggingAxis: Int = -1
+        /// Screen-space position when the drag started
+        private var dragStartScreen: CGPoint = .zero
+        /// IK target position when the drag started (URDF frame)
+        private var dragStartTargetPos: SIMD3<Double> = .zero
+        /// Reference to the SCNView (set in makeNSView, used for hit-testing)
+        weak var scnView: SCNView?
 
         // ── SCNSceneRendererDelegate ──────────────────────────────────────────────
         // Fired on the CVDisplayLink thread. SceneKit already holds its internal
@@ -167,6 +216,9 @@ struct RobotSceneView: NSViewRepresentable {
             let model           = snapshotModel
             let urdfDir         = snapshotURDFDir
             let collisionResult = snapshotCollisionResult
+            let useIK           = snapshotUseIK
+            let ikTarget        = snapshotIKTarget
+            let ikLink          = snapshotIKLink
             snapshotLock.unlock()
 
             // Throttled log — one line per second showing all joint angles.
@@ -200,6 +252,7 @@ struct RobotSceneView: NSViewRepresentable {
             updatePose(model: model, jointAngles: angles)
             updateObstacles(obstacles)
             updateCollisionTint(model: model, collidingLinks: collisionResult.collidingLinks)
+            updateGizmo(useIK: useIK, ikTarget: ikTarget, ikLink: ikLink, model: model, angles: angles)
         }
 
         // ── Robot state ───────────────────────────────────────────────────────
@@ -285,6 +338,139 @@ struct RobotSceneView: NSViewRepresentable {
             linkNodes         = [:]
             linkDefaultColors = [:]
             jointNodes        = [:]
+            gizmoNode?.removeFromParentNode()
+            gizmoNode = nil
+        }
+
+        // MARK: IK Gizmo
+
+        /// Show / hide and reposition the gizmo each render frame.
+        func updateGizmo(
+            useIK: Bool,
+            ikTarget: simd_double4x4,
+            ikLink: String,
+            model: RobotModel,
+            angles: [String: Double]
+        ) {
+            if !useIK {
+                if gizmoVisible { gizmoNode?.isHidden = true; gizmoVisible = false }
+                return
+            }
+
+            // Build the gizmo once.
+            if gizmoNode == nil { buildGizmo() }
+            guard let gizmo = gizmoNode else { return }
+
+            if gizmoVisible == false { gizmo.isHidden = false; gizmoVisible = true }
+
+            // Position the gizmo at the IK target in SceneKit space.
+            // ikTarget is in URDF (Z-up) frame; convert to SCN (Y-up).
+            gizmo.simdTransform = toSceneKit(ikTarget)
+        }
+
+        private func buildGizmo() {
+            let root = SCNNode()
+            root.name = "ik_gizmo"
+
+            func axisHandle(color: NSColor, axis: Int) -> SCNNode {
+                let length: CGFloat = 0.12
+                let radius: CGFloat = 0.008
+                // Shaft
+                let cyl = SCNCylinder(radius: radius, height: length)
+                cyl.firstMaterial?.diffuse.contents = color
+                cyl.firstMaterial?.emission.contents = color.withAlphaComponent(0.5)
+                let shaft = SCNNode(geometry: cyl)
+
+                // Cone tip
+                let cone = SCNCone(topRadius: 0, bottomRadius: radius * 2.5, height: radius * 5)
+                cone.firstMaterial?.diffuse.contents = color
+                cone.firstMaterial?.emission.contents = color.withAlphaComponent(0.5)
+                let tip = SCNNode(geometry: cone)
+                tip.position = SCNVector3(0, Float(length / 2 + radius * 2.5), 0)
+                shaft.addChildNode(tip)
+
+                // Rotate the Y-axis shaft onto the correct world axis.
+                let wrapper = SCNNode()
+                wrapper.name = "gizmo:\(axis)"
+                switch axis {
+                case 0: // X — rotate -90° around Z
+                    wrapper.eulerAngles = SCNVector3(0, 0, -Float.pi / 2)
+                case 2: // Z — rotate +90° around X (SCN Z is URDF -Y; handled in transform)
+                    wrapper.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
+                default: break   // Y — no rotation needed
+                }
+                // Offset shaft so base is at origin
+                shaft.position = SCNVector3(0, Float(length / 2), 0)
+                wrapper.addChildNode(shaft)
+                return wrapper
+            }
+
+            root.addChildNode(axisHandle(color: .red,   axis: 0))  // X
+            root.addChildNode(axisHandle(color: .green, axis: 1))  // Y
+            root.addChildNode(axisHandle(color: .blue,  axis: 2))  // Z
+
+            scene.rootNode.addChildNode(root)
+            gizmoNode = root
+            root.isHidden = true
+        }
+
+        // MARK: Mouse events (IK gizmo drag)
+
+        func handleMouseDown(event: NSEvent) {
+            guard let sv = scnView,
+                  let state = appState, state.useIK else { return }
+
+            let loc = sv.convert(event.locationInWindow, from: nil)
+            let hits = sv.hitTest(loc, options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
+
+            // Find the first hit whose node (or ancestor) is named "gizmo:N"
+            for hit in hits {
+                var n: SCNNode? = hit.node
+                while let node = n {
+                    if let name = node.name, name.hasPrefix("gizmo:"),
+                       let axisChar = name.last, let axis = Int(String(axisChar)) {
+                        draggingAxis = axis
+                        dragStartScreen = loc
+                        dragStartTargetPos = state.ikTarget.translation
+                        return
+                    }
+                    n = node.parent
+                }
+            }
+            draggingAxis = -1
+        }
+
+        func handleMouseDrag(event: NSEvent) {
+            guard draggingAxis >= 0,
+                  let sv = scnView,
+                  let state = appState else { return }
+
+            let loc = sv.convert(event.locationInWindow, from: nil)
+            let dx = Double(loc.x - dragStartScreen.x)
+            let dy = Double(loc.y - dragStartScreen.y)
+
+            // Scale screen pixels → metres. ~200 px per metre feels responsive.
+            let scale = 1.0 / 200.0
+            var delta = SIMD3<Double>.zero
+            switch draggingAxis {
+            case 0: delta = SIMD3(dx * scale, 0, 0)
+            case 1: delta = SIMD3(0, 0, dy * scale)   // URDF Z = up
+            case 2: delta = SIMD3(0, -dx * scale, 0)  // URDF Y = screen horizontal
+            default: return
+            }
+
+            var newTarget = state.ikTarget
+            newTarget.columns.3 = SIMD4(
+                dragStartTargetPos.x + delta.x,
+                dragStartTargetPos.y + delta.y,
+                dragStartTargetPos.z + delta.z,
+                1
+            )
+            state.ikTarget = newTarget
+        }
+
+        func handleMouseUp(event: NSEvent) {
+            draggingAxis = -1
         }
 
         // MARK: Update

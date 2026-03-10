@@ -27,6 +27,21 @@ struct SidebarView: View {
                 }
             }
 
+            // ── IK ─────────────────────────────────────────────────────────
+            if appState.isRobotLoaded {
+                Section("Inverse Kinematics") {
+                    Toggle("IK Mode", isOn: $appState.useIK)
+                    if appState.useIK {
+                        let links = appState.robotModel?.links.keys.sorted() ?? []
+                        Picker("End Effector", selection: $appState.ikEndEffectorLink) {
+                            ForEach(links, id: \.self) { Text($0).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .font(.caption)
+                    }
+                }
+            }
+
             // ── Obstacles ──────────────────────────────────────────────────
             Section {
                 if appState.obstacles.isEmpty {
