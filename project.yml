@@ -1,0 +1,70 @@
+name: MoveItMac
+
+options:
+  bundleIdPrefix: com.moveitclone
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "26.3"
+  createIntermediateGroups: true
+  groupSortPosition: none
+
+packages:
+  URDFKit:
+    path: Packages/URDFKit
+
+targets:
+  MoveItMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: MoveItMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moveitclone.MoveItMac
+        SWIFT_VERSION: "5"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MoveIt Mac
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+        ENABLE_HARDENED_RUNTIME: YES
+    dependencies:
+      - package: URDFKit
+        product: URDFKit
+      # C++ xcframeworks — added after running build_deps.sh
+      # - framework: deps/ompl.xcframework
+      #   embed: true
+      # - framework: deps/fcl.xcframework
+      #   embed: true
+      # - framework: deps/kdl.xcframework
+      #   embed: true
+
+  MoveItMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MoveItMacTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moveitclone.MoveItMacTests
+        SWIFT_VERSION: "5"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+    dependencies:
+      - target: MoveItMac
+
+schemes:
+  MoveItMac:
+    build:
+      targets:
+        MoveItMac: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MoveItMacTests
+    archive:
+      config: Release

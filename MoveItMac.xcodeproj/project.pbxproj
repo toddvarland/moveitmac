@@ -1,0 +1,509 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1CE30C1241AC9A5F675EBFF8 /* URDFKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8634FA3849998BA4B3E2A0DA /* URDFKit */; };
+		3BAB39BBE99D545294E1E9AB /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F027CABC972E309B6FDFAF52 /* SidebarView.swift */; };
+		42979DB914E9F506FA8E6F58 /* MoveItMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AEA8A828E9B1BC86310BF28 /* MoveItMacApp.swift */; };
+		4D717309232AA2C99D98E593 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B05B9934C4F94D10580A431F /* Assets.xcassets */; };
+		591EE5C749C6CF3646E40731 /* MoveItMacTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E033E2C0E4AF5C175B818B1 /* MoveItMacTests.swift */; };
+		8DE265B27E4EC5427200043F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A46978B94B5E0E3F7129EE /* ContentView.swift */; };
+		967CC82A5F2F38D68E7FCF13 /* JointSliderPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5691490671643F2A5CFE5B00 /* JointSliderPanel.swift */; };
+		AA00BB11CC22DD33EE44FF55 /* CollisionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */; };
+		C6C1E23CEB9CD82A4BD42C77 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ADAE6E03B6D18F3D9133D54 /* AppState.swift */; };
+		DB0E1DAEE69D32642850A043 /* RobotSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F8110B62A8CAF77652E92B0 /* RobotSceneView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		550909A59CC41942D13553E5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F06413BA5DC4CAA4ED5EF31E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 56848F1ECE9379EC8DB2E1DA;
+			remoteInfo = MoveItMac;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		07A46978B94B5E0E3F7129EE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		2AEA8A828E9B1BC86310BF28 /* MoveItMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveItMacApp.swift; sourceTree = "<group>"; };
+		2B6CCC85DDF05770C9A1C9EA /* URDFKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = URDFKit; path = Packages/URDFKit; sourceTree = SOURCE_ROOT; };
+		4F8110B62A8CAF77652E92B0 /* RobotSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotSceneView.swift; sourceTree = "<group>"; };
+		5691490671643F2A5CFE5B00 /* JointSliderPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointSliderPanel.swift; sourceTree = "<group>"; };
+		5CE570FD79AD45C650110A52 /* MoveItMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MoveItMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6ADAE6E03B6D18F3D9133D54 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollisionChecker.swift; sourceTree = "<group>"; };
+		6E033E2C0E4AF5C175B818B1 /* MoveItMacTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveItMacTests.swift; sourceTree = "<group>"; };
+		99D3401BB4B1EE93F7507C75 /* MoveItMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MoveItMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B05B9934C4F94D10580A431F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F027CABC972E309B6FDFAF52 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BAB3524E7DA7D242212F5654 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1CE30C1241AC9A5F675EBFF8 /* URDFKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3682567396115099EB21F38A /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				2B6CCC85DDF05770C9A1C9EA /* URDFKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		3774E79B90F2153A828D973E /* MoveItMacTests */ = {
+			isa = PBXGroup;
+			children = (
+				6E033E2C0E4AF5C175B818B1 /* MoveItMacTests.swift */,
+			);
+			path = MoveItMacTests;
+			sourceTree = "<group>";
+		};
+		38B3FCBBB5AC63A3457388BB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5CE570FD79AD45C650110A52 /* MoveItMac.app */,
+				99D3401BB4B1EE93F7507C75 /* MoveItMacTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		459513EE4CCBA71E81010C8D = {
+			isa = PBXGroup;
+			children = (
+				6AECA7498F1017F5E4FB5FDF /* MoveItMac */,
+				3774E79B90F2153A828D973E /* MoveItMacTests */,
+				3682567396115099EB21F38A /* Packages */,
+				38B3FCBBB5AC63A3457388BB /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6AECA7498F1017F5E4FB5FDF /* MoveItMac */ = {
+			isa = PBXGroup;
+			children = (
+				F04C588BF4B1D05D31A74F5B /* App */,
+				72EA4C5F7ED82E4EFC242DEE /* Model */,
+				86A1DEDFA7D5332C2C4418E7 /* Resources */,
+				B9E05EF8A45E5AA1F7EF140B /* Views */,
+			);
+			path = MoveItMac;
+			sourceTree = "<group>";
+		};
+		72EA4C5F7ED82E4EFC242DEE /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				6ADAE6E03B6D18F3D9133D54 /* AppState.swift */,
+				FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		86A1DEDFA7D5332C2C4418E7 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B05B9934C4F94D10580A431F /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		B9E05EF8A45E5AA1F7EF140B /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				07A46978B94B5E0E3F7129EE /* ContentView.swift */,
+				5691490671643F2A5CFE5B00 /* JointSliderPanel.swift */,
+				4F8110B62A8CAF77652E92B0 /* RobotSceneView.swift */,
+				F027CABC972E309B6FDFAF52 /* SidebarView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F04C588BF4B1D05D31A74F5B /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2AEA8A828E9B1BC86310BF28 /* MoveItMacApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		56848F1ECE9379EC8DB2E1DA /* MoveItMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 132AC3ECF4AB346F771E6F99 /* Build configuration list for PBXNativeTarget "MoveItMac" */;
+			buildPhases = (
+				DCD95C30667393A2A33ADDED /* Sources */,
+				79855B3F6C8F6AAAF7818E10 /* Resources */,
+				BAB3524E7DA7D242212F5654 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MoveItMac;
+			packageProductDependencies = (
+				8634FA3849998BA4B3E2A0DA /* URDFKit */,
+			);
+			productName = MoveItMac;
+			productReference = 5CE570FD79AD45C650110A52 /* MoveItMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DB1A8A3425D813AFCE759342 /* MoveItMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7EDA105C3DB973BCC8A8E3AD /* Build configuration list for PBXNativeTarget "MoveItMacTests" */;
+			buildPhases = (
+				53D024F4835A5E14DC9F00F8 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2A1D1A2E48BD15BA3FB95DF7 /* PBXTargetDependency */,
+			);
+			name = MoveItMacTests;
+			packageProductDependencies = (
+			);
+			productName = MoveItMacTests;
+			productReference = 99D3401BB4B1EE93F7507C75 /* MoveItMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F06413BA5DC4CAA4ED5EF31E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 3419D1EF3EB9AFEF652D2D87 /* Build configuration list for PBXProject "MoveItMac" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 459513EE4CCBA71E81010C8D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				48677FF5CDCA1A08F80AAB14 /* XCLocalSwiftPackageReference "Packages/URDFKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 38B3FCBBB5AC63A3457388BB /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				56848F1ECE9379EC8DB2E1DA /* MoveItMac */,
+				DB1A8A3425D813AFCE759342 /* MoveItMacTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		79855B3F6C8F6AAAF7818E10 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D717309232AA2C99D98E593 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		53D024F4835A5E14DC9F00F8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				591EE5C749C6CF3646E40731 /* MoveItMacTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCD95C30667393A2A33ADDED /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C6C1E23CEB9CD82A4BD42C77 /* AppState.swift in Sources */,
+				AA00BB11CC22DD33EE44FF55 /* CollisionChecker.swift in Sources */,
+				8DE265B27E4EC5427200043F /* ContentView.swift in Sources */,
+				967CC82A5F2F38D68E7FCF13 /* JointSliderPanel.swift in Sources */,
+				42979DB914E9F506FA8E6F58 /* MoveItMacApp.swift in Sources */,
+				DB0E1DAEE69D32642850A043 /* RobotSceneView.swift in Sources */,
+				3BAB39BBE99D545294E1E9AB /* SidebarView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2A1D1A2E48BD15BA3FB95DF7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 56848F1ECE9379EC8DB2E1DA /* MoveItMac */;
+			targetProxy = 550909A59CC41942D13553E5 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		6895341EE1DB05B950F56BD5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A0C716ACD2DFDB6D84726B5E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.moveitclone.MoveItMacTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MoveItMac.app/Contents/MacOS/MoveItMac";
+			};
+			name = Release;
+		};
+		B26D5777701F8E8E9126CBFC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.moveitclone.MoveItMacTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MoveItMac.app/Contents/MacOS/MoveItMac";
+			};
+			name = Debug;
+		};
+		C5D6828735AE882B89ABC0CC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MoveIt Mac";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.moveitclone.MoveItMac;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5;
+			};
+			name = Release;
+		};
+		CFA43B622D688BA7CFF90A6A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		F3F9884D37F7A5340DACD9F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MoveIt Mac";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.moveitclone.MoveItMac;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		132AC3ECF4AB346F771E6F99 /* Build configuration list for PBXNativeTarget "MoveItMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F3F9884D37F7A5340DACD9F1 /* Debug */,
+				C5D6828735AE882B89ABC0CC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3419D1EF3EB9AFEF652D2D87 /* Build configuration list for PBXProject "MoveItMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6895341EE1DB05B950F56BD5 /* Debug */,
+				CFA43B622D688BA7CFF90A6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7EDA105C3DB973BCC8A8E3AD /* Build configuration list for PBXNativeTarget "MoveItMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B26D5777701F8E8E9126CBFC /* Debug */,
+				A0C716ACD2DFDB6D84726B5E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		48677FF5CDCA1A08F80AAB14 /* XCLocalSwiftPackageReference "Packages/URDFKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/URDFKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8634FA3849998BA4B3E2A0DA /* URDFKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = URDFKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F06413BA5DC4CAA4ED5EF31E /* Project object */;
+}
