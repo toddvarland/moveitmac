@@ -27,6 +27,60 @@ struct SidebarView: View {
                 }
             }
 
+            // ── Planner ────────────────────────────────────────────────────
+            if appState.isRobotLoaded {
+                Section("Planner") {
+                    HStack(spacing: 6) {
+                        Button("Set Start") { appState.setPlanStart() }
+                            .buttonStyle(.bordered)
+                        Button("Set Goal")  { appState.setPlanGoal() }
+                            .buttonStyle(.bordered)
+                    }
+                    .font(.caption)
+
+                    if !appState.planStart.isEmpty {
+                        Label("Start set", systemImage: "circle.fill")
+                            .font(.caption).foregroundStyle(.green)
+                    }
+                    if !appState.planGoal.isEmpty {
+                        Label("Goal set", systemImage: "target")
+                            .font(.caption).foregroundStyle(.blue)
+                    }
+
+                    Button {
+                        appState.startPlanning()
+                    } label: {
+                        if appState.plannerStatus == .planning {
+                            HStack(spacing: 6) {
+                                ProgressView().scaleEffect(0.65)
+                                Text("Planning…")
+                            }
+                        } else {
+                            Text("Plan")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!appState.canPlan)
+
+                    if !appState.plannerMessage.isEmpty {
+                        Text(appState.plannerMessage)
+                            .font(.caption)
+                            .foregroundStyle(
+                                appState.plannerStatus == .done    ? Color.green  :
+                                appState.plannerStatus == .failed  ? Color.red    :
+                                Color.secondary
+                            )
+                    }
+
+                    if appState.plannerStatus == .done {
+                        Button("Apply Goal") {
+                            appState.jointAngles = appState.planGoal
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+
             // ── IK ─────────────────────────────────────────────────────────
             if appState.isRobotLoaded {
                 Section("Inverse Kinematics") {

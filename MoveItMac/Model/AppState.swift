@@ -107,6 +107,71 @@ final class AppState: ObservableObject {
     /// Written by the gizmo drag handler; read by the 120 Hz timer.
     var ikTarget: simd_double4x4 = .identity
 
+    // ── Planner ───────────────────────────────────────────────────────────
+
+    enum PlannerStatus: Equatable {
+        case idle, planning, done, failed
+    }
+
+    @Published var plannerStatus:  PlannerStatus = .idle
+    @Published var plannerMessage: String         = ""
+    /// RRT trajectory: sequence of joint-angle configs from start → goal.
+    /// Not @Published — read directly by the playback timer.
+    var trajectory: [[String: Double]] = []
+
+    /// Captured start / goal configurations for the planner.
+    var planStart: [String: Double] = [:]
+    var planGoal:  [String: Double] = [:]
+
+    var canPlan: Bool {
+        isRobotLoaded && !planGoal.isEmpty && plannerStatus != .planning
+    }
+
+    func setPlanStart() {
+        planStart = jointAngles
+        plannerMessage = "Start captured"
+    }
+
+    func setPlanGoal() {
+        planGoal = jointAngles
+        plannerMessage = "Goal captured"
+    }
+
+    func startPlanning() {
+        guard let model = robotModel, canPlan else { return }
+        plannerStatus  = .planning
+        plannerMessage = "Planning…"
+        trajectory     = []
+
+        let startCfg = planStart.isEmpty ? jointAngles : planStart
+        let goalCfg  = planGoal
+        let obsCopy  = obstacles
+
+        planningTask?.cancel()
+        planningTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let result = RRTPlanner.plan(
+                model:  model,
+                start:  startCfg,
+                goal:   goalCfg,
+                isCollisionFree: { angles in
+                    let fk = ForwardKinematics.compute(model: model, jointAngles: angles)
+                    let cr = CollisionChecker.check(model: model, fkResult: fk, obstacles: obsCopy)
+                    return !cr.hasCollision
+                }
+            )
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.trajectory     = result.path
+                self.plannerStatus  = result.success ? .done : .failed
+                self.plannerMessage = result.success
+                    ? "Found path: \(result.path.count) waypoints (\(result.iterations) iters)"
+                    : "No path found (\(result.iterations) iters)"
+            }
+        }
+    }
+
+    private var planningTask: Task<Void, Never>?
+
     // MARK: - Actions
 
     /// Opens a file-open panel and loads the selected URDF.
