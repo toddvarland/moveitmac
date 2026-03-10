@@ -106,7 +106,7 @@ enum CollisionChecker {
         case .sphere(let r):            radius = r
         case .cylinder(let r, let h):  radius = (r * r + (h / 2) * (h / 2)).squareRoot()
         case .box(let s):              radius = simd_length(s) / 2
-        case .mesh(_, let scale):      radius = simd_length(scale) * 0.15
+        case .mesh(_, _):             radius = 0.04
         case nil:                      radius = 0.03
         }
         return (center, max(radius, 0.01))
@@ -122,10 +122,36 @@ enum CollisionChecker {
         return (obs.position, r)
     }
 
-    /// Set of directly-adjacent link pairs that share a joint — never checked for self-collision.
-    private static func adjacentPairs(_ model: RobotModel) -> Set<CollisionPair> {
-        model.joints.values.reduce(into: Set<CollisionPair>()) { set, joint in
-            set.insert(CollisionPair(joint.parentLinkName, joint.childLinkName))
+    /// All link pairs within `hops` joints of each other — never checked for self-collision.
+    /// hops=2 skips both direct neighbours (parent/child) and grandparent/grandchild pairs,
+    /// which always overlap on compact serial arms like the Panda in their default pose.
+    private static func adjacentPairs(_ model: RobotModel, hops: Int = 3) -> Set<CollisionPair> {
+        // Build undirected adjacency map.
+        var neighbors: [String: Set<String>] = [:]
+        for joint in model.joints.values {
+            neighbors[joint.parentLinkName, default: []].insert(joint.childLinkName)
+            neighbors[joint.childLinkName, default: []].insert(joint.parentLinkName)
         }
+        // BFS up to `hops` from each link; add every reachable link as a skip pair.
+        var result = Set<CollisionPair>()
+        for startLink in model.links.keys {
+            var visited = Set<String>([startLink])
+            var frontier: Set<String> = [startLink]
+            for _ in 0 ..< hops {
+                var next = Set<String>()
+                for link in frontier {
+                    for neighbor in neighbors[link, default: []] where !visited.contains(neighbor) {
+                        visited.insert(neighbor)
+                        next.insert(neighbor)
+                    }
+                }
+                frontier = next
+            }
+            visited.remove(startLink)
+            for link in visited {
+                result.insert(CollisionPair(startLink, link))
+            }
+        }
+        return result
     }
 }
