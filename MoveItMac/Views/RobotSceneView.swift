@@ -389,18 +389,20 @@ struct RobotSceneView: NSViewRepresentable {
                 tip.position = SCNVector3(0, Float(length / 2 + radius * 2.5), 0)
                 shaft.addChildNode(tip)
 
-                // Text label at the tip — single character, fixed-offset centering.
+                // Text label at the tip — 10pt font scaled to ~2 cm world height.
                 let text = SCNText(string: label, extrusionDepth: 0)
-                text.font = NSFont.boldSystemFont(ofSize: 0.03)
-                text.flatness = 0.01
+                text.font = NSFont.boldSystemFont(ofSize: 10)
+                text.flatness = 0.1
                 text.firstMaterial?.diffuse.contents = color
-                text.firstMaterial?.emission.contents = color.withAlphaComponent(0.8)
+                text.firstMaterial?.emission.contents = color.withAlphaComponent(0.9)
                 text.firstMaterial?.isDoubleSided = true
                 let textNode = SCNNode(geometry: text)
-                // Approx half-width of a 0.03-pt bold glyph to visually centre it.
-                let halfGlyph: Float = 0.010
-                let tipOffset: Float = Float(length) / 2 + Float(radius) * 7
-                textNode.position = SCNVector3(-halfGlyph, tipOffset, -halfGlyph)
+                // 10 pt * 0.002 ≈ 0.02 m (2 cm) — matches the 12 cm arm scale.
+                let gs: Float = 0.002
+                textNode.scale = SCNVector3(gs, gs, gs)
+                // Position just above the cone tip; −0.010 m centres an ~2 cm glyph.
+                let tipY: Float = Float(length) / 2 + Float(radius) * 7
+                textNode.position = SCNVector3(-0.010, tipY, 0)
                 // Billboard so the label always faces the camera.
                 textNode.constraints = [SCNBillboardConstraint()]
                 shaft.addChildNode(textNode)
