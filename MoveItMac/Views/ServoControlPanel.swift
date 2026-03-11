@@ -12,6 +12,9 @@ struct ServoControlPanel: View {
     @State private var availablePorts: [String] = []
     @State private var selectedPort:   String   = ""
 
+    /// 5 Hz clock used to read back physical joint angles when idle.
+    private let feedbackClock = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -29,6 +32,18 @@ struct ServoControlPanel: View {
         .frame(width: 340, height: 540)
         .onAppear  { rescanPorts() }
         .onDisappear { servo.clearCommands() }
+        .onReceive(feedbackClock) { _ in
+            // Mirror physical arm angles into the virtual model when not jogging.
+            guard servo.bridge.isConnected, servo.status == .idle else { return }
+            servo.bridge.pollAngles { angles in
+                guard let angles, let model = appState.robotModel else { return }
+                let names = model.orderedActuatedJointNames
+                for (i, name) in names.prefix(6).enumerated() {
+                    appState.jointAngles[name] = angles[i]
+                }
+                servo.angleRevision += 1
+            }
+        }
     }
 
     // MARK: - Header
@@ -52,7 +67,33 @@ struct ServoControlPanel: View {
 
             Divider()
             hardwareRow
+            Divider()
+            zeroPoseRow
         }
+        .background(.bar)
+    }
+
+    // MARK: - Zero Pose Row
+
+    private var zeroPoseRow: some View {
+        Button {
+            servo.stop()  // safe to call even if already idle
+            if let model = appState.robotModel {
+                for name in model.orderedActuatedJointNames {
+                    appState.jointAngles[name] = 0
+                }
+                servo.angleRevision += 1
+            }
+            if servo.bridge.isConnected {
+                servo.bridge.sendAngles([0, 0, 0, 0, 0, 0], robotSpeed: 50)
+            }
+        } label: {
+            Label("Zero Pose", systemImage: "arrow.up.to.line")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
         .background(.bar)
     }
 
@@ -185,10 +226,11 @@ struct ServoControlPanel: View {
         Group {
             if let model = appState.robotModel {
                 let names = model.orderedActuatedJointNames
-                // TimelineView forces a 20 Hz re-read of appState.jointAngles
-                // (jointAngles is not @Published, so this is the refresh mechanism).
-                TimelineView(.periodic(from: .now, by: 0.05)) { _ in
-                    List {
+                // servo.angleRevision is @Published and increments at ~20 Hz,
+                // driving re-renders of this view so angle text stays current.
+                let _ = servo.angleRevision
+                ScrollView {
+                    VStack(spacing: 0) {
                         ForEach(names, id: \.self) { name in
                             JointJogRow(
                                 name:      name,
@@ -197,9 +239,11 @@ struct ServoControlPanel: View {
                                 onPress:   { dir in servo.setJoint(name, direction: dir) },
                                 onRelease: { servo.setJoint(name, direction: 0) }
                             )
+                            Divider().padding(.leading, 8)
                         }
                     }
-                    .listStyle(.inset)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
                 }
             } else {
                 ContentUnavailableView("No Robot Loaded", systemImage: "gearshape.2")
@@ -331,18 +375,9 @@ private struct HoldButton: View {
                 in: RoundedRectangle(cornerRadius: 5)
             )
             .contentShape(RoundedRectangle(cornerRadius: 5))
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if !isPressed {
-                            isPressed = true
-                            onPress()
-                        }
-                    }
-                    .onEnded { _ in
-                        isPressed = false
-                        onRelease()
-                    }
-            )
+            .onLongPressGesture(minimumDuration: .infinity, maximumDistance: 50, pressing: { isPressing in
+                isPressed = isPressing
+                if isPressing { onPress() } else { onRelease() }
+            }, perform: {})
     }
 }

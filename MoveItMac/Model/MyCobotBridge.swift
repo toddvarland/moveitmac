@@ -25,6 +25,10 @@ final class MyCobotBridge: ObservableObject {
     // MARK: - Private
 
     private var fd: Int32 = -1
+    /// All writes are dispatched onto this queue so blocking I/O never stalls the main thread.
+    private let writeQueue = DispatchQueue(label: "mycobot.serial", qos: .userInteractive)
+    /// GET_ANGLES requests and their reads run on this queue, separate from writes.
+    private let readQueue  = DispatchQueue(label: "mycobot.serial.read", qos: .utility)
 
     // MARK: - Port discovery
 
@@ -50,6 +54,11 @@ final class MyCobotBridge: ObservableObject {
             lastError = "Cannot open \(port): \(String(cString: strerror(errno)))"
             return
         }
+        // Clear O_NONBLOCK so writes block until the UART drains.
+        // O_NONBLOCK is needed during open() to avoid hanging on a modem,
+        // but must be removed afterwards or write() silently drops bytes.
+        let flags = fcntl(newFd, F_GETFL)
+        if flags >= 0 { _ = fcntl(newFd, F_SETFL, flags & ~O_NONBLOCK) }
 
         var tty = termios()
         guard tcgetattr(newFd, &tty) == 0 else {
@@ -65,6 +74,12 @@ final class MyCobotBridge: ObservableObject {
         tty.c_cflag &= ~tcflag_t(PARENB)
         tty.c_cflag &= ~tcflag_t(CSTOPB)
         tty.c_cflag |= tcflag_t(CREAD) | tcflag_t(CLOCAL)
+        // VMIN=0, VTIME=2: read() times out after 200 ms instead of blocking forever.
+        // This lets pollAngles recover gracefully when the robot doesn't respond.
+        withUnsafeMutableBytes(of: &tty.c_cc) { cc in
+            cc[Int(VMIN)]  = 0
+            cc[Int(VTIME)] = 2   // units of 100 ms → 200 ms timeout
+        }
 
         guard tcsetattr(newFd, TCSANOW, &tty) == 0 else {
             close(newFd)
@@ -75,16 +90,9 @@ final class MyCobotBridge: ObservableObject {
         fd            = newFd
         connectedPort = port
         isConnected   = true
-
-        // Power on the servos so they accept angle commands.
-        sendFrame(cmd: 0x10, params: [])
     }
 
     func disconnect() {
-        if isConnected {
-            // Release torque before closing so the arm goes limp gracefully.
-            sendFrame(cmd: 0x13, params: [])
-        }
         guard fd >= 0 else { return }
         close(fd)
         fd            = -1
@@ -94,39 +102,112 @@ final class MyCobotBridge: ObservableObject {
 
     // MARK: - Send angles
 
-    /// Transmit a SET_ANGLES frame to the robot.
-    ///
-    /// - Parameters:
-    ///   - radians: Joint angles in radians, BFS order J1–J6 (first 6 used).
-    ///   - robotSpeed: Firmware speed parameter 1–100.
-    func sendAngles(_ radians: [Double], robotSpeed: Int) {
-        guard isConnected, fd >= 0, radians.count >= 6 else { return }
-
-        var params = [UInt8](repeating: 0, count: 13)   // 6 × int16 + 1 speed
-        for i in 0 ..< 6 {
-            let deg = radians[i] * (180.0 / .pi)
-            let raw = Int((deg * 100).rounded())
-                .clamped(to: Int(Int16.min) ... Int(Int16.max))
-            // Encode as big-endian two's complement int16.
-            let encoded = raw >= 0 ? raw : raw + 65536
-            params[i * 2]     = UInt8(encoded >> 8)
-            params[i * 2 + 1] = UInt8(encoded & 0xFF)
-        }
-        params[12] = UInt8(robotSpeed.clamped(to: 1 ... 100))
-        sendFrame(cmd: 0x20, params: params)
+    /// Send a single joint to a target angle (radians) at the given speed.
+    func sendAngle(jointIndex: Int, radians: Double, robotSpeed: Int) {
+        guard isConnected else { return }
+        let spd = UInt8(robotSpeed.clamped(to: 1 ... 100))
+        let deg = radians * (180.0 / .pi)
+        let raw = Int((deg * 100).rounded()).clamped(to: Int(Int16.min) ... Int(Int16.max))
+        let encoded = raw >= 0 ? raw : raw + 65536
+        let params: [UInt8] = [UInt8(jointIndex + 1), UInt8(encoded >> 8), UInt8(encoded & 0xFF), spd]
+        enqueueFrame(cmd: 0x21, params: params)
     }
 
-    // MARK: - Frame encoder
+    /// Send all 6 joints using individual SET_ANGLE frames with 50 ms gaps.
+    /// Runs on a fresh Task so it's never blocked by queued jog frames.
+    func sendAngles(_ radians: [Double], robotSpeed: Int) {
+        guard isConnected, fd >= 0, radians.count >= 6 else {
+            print("[Bridge] sendAngles skipped — isConnected=\(isConnected) fd=\(fd)")
+            return
+        }
+        print("[Bridge] sendAngles called fd=\(fd)")
+        let spd = UInt8(robotSpeed.clamped(to: 1 ... 100))
+        var frames: [[UInt8]] = []
+        for i in 0 ..< 6 {
+            let deg = radians[i] * (180.0 / .pi)
+            let raw = Int((deg * 100).rounded()).clamped(to: Int(Int16.min) ... Int(Int16.max))
+            let encoded = raw >= 0 ? raw : raw + 65536
+            frames.append(buildFrame(cmd: 0x21, params: [UInt8(i + 1), UInt8(encoded >> 8), UInt8(encoded & 0xFF), spd]))
+        }
+        let capturedFd = fd
+        Task.detached(priority: .userInitiated) {
+            for (i, frame) in frames.enumerated() {
+                var f = frame
+                let n = Darwin.write(capturedFd, &f, f.count)
+                print("[Bridge] frame \(i+1)/6 wrote \(n) bytes: \(f)")
+                usleep(50_000)
+            }
+        }
+    }
 
-    /// Encode and write a myCobot binary frame.
-    /// LEN = len(params) + 2  (CMD byte + footer byte), per pymycobot protocol.
-    private func sendFrame(cmd: UInt8, params: [UInt8]) {
-        guard fd >= 0 else { return }
+    // MARK: - Read angles (GET_ANGLES, CMD 0x20)
+
+    /// Send a GET_ANGLES request and return 6 joint angles (radians) via callback on the main queue.
+    /// Fires `completion(nil)` on timeout or parse failure.  Safe to call only when the
+    /// servo engine is idle (no concurrent jog writes on the wire).
+    func pollAngles(completion: @escaping ([Double]?) -> Void) {
+        guard isConnected, fd >= 0 else { return }
+        let capturedFd = fd
+        // GET_ANGLES request: [0xFE, 0xFE, 0x02, 0x20, 0xFA]
+        var req: [UInt8] = [0xFE, 0xFE, 0x02, 0x20, 0xFA]
+        readQueue.async {
+            // Flush stale input so we don't accidentally parse a leftover frame.
+            tcflush(capturedFd, TCIFLUSH)
+            _ = Darwin.write(capturedFd, &req, req.count)
+            // Give the robot ~80 ms to formulate and transmit its 17-byte response.
+            usleep(80_000)
+            // Read up to 64 bytes; VTIME=2 provides a 200 ms backstop if data is late.
+            var buf = [UInt8](repeating: 0, count: 64)
+            var totalRead = 0
+            for _ in 0 ..< 4 {
+                let n = buf.withUnsafeMutableBytes { ptr in
+                    Darwin.read(capturedFd, ptr.baseAddress!.advanced(by: totalRead),
+                                64 - totalRead)
+                }
+                guard n > 0 else { break }
+                totalRead += n
+                if totalRead >= 17 { break }
+            }
+            guard totalRead >= 17 else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            let data = Array(buf.prefix(totalRead))
+            // Scan for a valid response frame:
+            // [0xFE, 0xFE, LEN, 0x20, J1H, J1L, …, J6H, J6L, 0xFA]  (17 bytes)
+            for i in 0 ... (data.count - 17) {
+                guard data[i] == 0xFE, data[i + 1] == 0xFE,
+                      data[i + 3] == 0x20, data[i + 16] == 0xFA else { continue }
+                var angles = [Double]()
+                for j in 0 ..< 6 {
+                    let hi  = UInt16(data[i + 4 + j * 2])
+                    let lo  = UInt16(data[i + 5 + j * 2])
+                    let raw = Int16(bitPattern: (hi << 8) | lo)
+                    // Protocol units: 0.01 °; convert to radians for URDF.
+                    angles.append(Double(raw) / 100.0 * .pi / 180.0)
+                }
+                DispatchQueue.main.async { completion(angles) }
+                return
+            }
+            DispatchQueue.main.async { completion(nil) }
+        }
+    }
+
+    // MARK: - Frame helpers
+
+    private func buildFrame(cmd: UInt8, params: [UInt8]) -> [UInt8] {
         var frame: [UInt8] = [0xFE, 0xFE, UInt8(params.count + 2), cmd]
         frame.append(contentsOf: params)
         frame.append(0xFA)
-        frame.withUnsafeBytes { ptr in
-            _ = Darwin.write(fd, ptr.baseAddress!, frame.count)
+        return frame
+    }
+
+    private func enqueueFrame(cmd: UInt8, params: [UInt8]) {
+        guard fd >= 0 else { return }
+        var frame = buildFrame(cmd: cmd, params: params)
+        let capturedFd = fd
+        writeQueue.async {
+            _ = Darwin.write(capturedFd, &frame, frame.count)
         }
     }
 

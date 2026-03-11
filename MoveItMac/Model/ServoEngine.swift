@@ -36,6 +36,8 @@ final class ServoEngine: ObservableObject {
     @Published var mode: Mode = .joint
     /// Speed multiplier (0.1 – 2.0) applied to all velocity magnitudes.
     @Published var speedScale: Double = 0.5
+    /// Incremented at ~20 Hz while running so ServoControlPanel angle displays refresh.
+    @Published var angleRevision: Int = 0
 
     // MARK: - Velocity commands (set/cleared by ServoControlPanel)
 
@@ -165,21 +167,37 @@ final class ServoEngine: ObservableObject {
             obstacles:    appState.obstacles,
             disabledPairs: appState.robotSetup.disabledCollisions
         )
-        if cr.hasCollision {
-            // Halt: stop timer and notify the UI.
+        // Halt on obstacle hits unconditionally.
+        // Only halt on self-collision once the ACM has been computed — before that the
+        // disabled pairs list is empty and adjacent-link overlaps look like collisions.
+        let acmReady = !(appState.robotSetup.disabledCollisions.isEmpty)
+        let shouldHalt = !cr.obstacleHits.isEmpty || (acmReady && !cr.selfCollisions.isEmpty)
+        if shouldHalt {
             timer?.invalidate()
             timer = nil
             clearCommands()
             status = .halted
         } else {
             appState.jointAngles = candidate
-            // Forward joint angles to physical robot at 10 Hz (every 10th tick).
             bridgeTick += 1
+            // Publish angle revision at ~20 Hz so the jog panel text updates.
+            if bridgeTick % 5 == 0 { angleRevision += 1 }
+            // Forward to physical robot at 10 Hz.
             if bridgeTick % 10 == 0, bridge.isConnected {
-                let names  = model.orderedActuatedJointNames
-                let angles = Array(names.prefix(6).map { candidate[$0] ?? 0 })
-                let spd    = max(5, min(100, Int((speedScale * 50).rounded())))
-                bridge.sendAngles(angles, robotSpeed: spd)
+                let names = model.orderedActuatedJointNames
+                let spd   = max(5, min(100, Int((speedScale * 50).rounded())))
+                switch mode {
+                case .joint:
+                    // Only send the joints actively being jogged — avoids
+                    // flooding the arm with commands for joints that aren't moving.
+                    for (name, _) in jointCommands {
+                        guard let idx = names.firstIndex(of: name), idx < 6 else { continue }
+                        bridge.sendAngle(jointIndex: idx, radians: candidate[name] ?? 0, robotSpeed: spd)
+                    }
+                case .cartesian:
+                    let angles = Array(names.prefix(6).map { candidate[$0] ?? 0 })
+                    bridge.sendAngles(angles, robotSpeed: spd)
+                }
             }
         }
     }

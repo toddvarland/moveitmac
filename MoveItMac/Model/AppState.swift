@@ -294,6 +294,11 @@ final class AppState: ObservableObject {
         robotModel = model
         robotModelRevision += 1
         robotSetup = .empty   // clear previous setup when a new robot is loaded
+        // Auto-generate the ACM in the background so jogging doesn't halt on false positives.
+        Task.detached(priority: .utility) { [weak self] in
+            let pairs = ACMGenerator.compute(model: model)
+            await MainActor.run { self?.robotSetup.disabledCollisions = pairs }
+        }
         // Initialise all actuated joints to their midpoint (or 0 if no limits)
         jointAngles = model.joints.values
             .filter { $0.isActuated }
