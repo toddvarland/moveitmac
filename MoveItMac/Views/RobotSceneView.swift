@@ -372,9 +372,10 @@ struct RobotSceneView: NSViewRepresentable {
             let root = SCNNode()
             root.name = "ik_gizmo"
 
-            func axisHandle(color: NSColor, axis: Int, label: String) -> SCNNode {
-                let length: CGFloat = 0.12
-                let radius: CGFloat = 0.008
+            let length: CGFloat = 0.12
+            let radius: CGFloat = 0.008
+
+            func axisShaft(color: NSColor, axis: Int) -> SCNNode {
                 // Shaft
                 let cyl = SCNCylinder(radius: radius, height: length)
                 cyl.firstMaterial?.diffuse.contents = color
@@ -389,43 +390,52 @@ struct RobotSceneView: NSViewRepresentable {
                 tip.position = SCNVector3(0, Float(length / 2 + radius * 2.5), 0)
                 shaft.addChildNode(tip)
 
-                // Text label at the tip — 10pt font scaled to ~2 cm world height.
-                let text = SCNText(string: label, extrusionDepth: 0)
-                text.font = NSFont.boldSystemFont(ofSize: 10)
-                text.flatness = 0.1
-                text.firstMaterial?.diffuse.contents = color
-                text.firstMaterial?.emission.contents = color.withAlphaComponent(0.9)
-                text.firstMaterial?.isDoubleSided = true
-                let textNode = SCNNode(geometry: text)
-                // 10 pt * 0.002 ≈ 0.02 m (2 cm) — matches the 12 cm arm scale.
-                let gs: Float = 0.002
-                textNode.scale = SCNVector3(gs, gs, gs)
-                // Position just above the cone tip; −0.010 m centres an ~2 cm glyph.
-                let tipY: Float = Float(length) / 2 + Float(radius) * 7
-                textNode.position = SCNVector3(-0.010, tipY, 0)
-                // Billboard so the label always faces the camera.
-                textNode.constraints = [SCNBillboardConstraint()]
-                shaft.addChildNode(textNode)
-
-                // Rotate the Y-axis shaft onto the correct world axis.
                 let wrapper = SCNNode()
                 wrapper.name = "gizmo:\(axis)"
                 switch axis {
-                case 0: // X — rotate -90° around Z
-                    wrapper.eulerAngles = SCNVector3(0, 0, -Float.pi / 2)
-                case 2: // Z — rotate +90° around X
-                    wrapper.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
-                default: break   // Y — no rotation needed
+                case 0: wrapper.eulerAngles = SCNVector3(0, 0, -Float.pi / 2)  // X
+                case 2: wrapper.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)   // Z
+                default: break
                 }
-                // Offset shaft so base is at origin
                 shaft.position = SCNVector3(0, Float(length / 2), 0)
                 wrapper.addChildNode(shaft)
                 return wrapper
             }
 
-            root.addChildNode(axisHandle(color: .red,   axis: 0, label: "X"))  // X
-            root.addChildNode(axisHandle(color: .green, axis: 1, label: "Y"))  // Y
-            root.addChildNode(axisHandle(color: .blue,  axis: 2, label: "Z"))  // Z
+            root.addChildNode(axisShaft(color: .red,   axis: 0))
+            root.addChildNode(axisShaft(color: .green, axis: 1))
+            root.addChildNode(axisShaft(color: .blue,  axis: 2))
+
+            // Labels attached directly to root (not to rotated wrappers) so the
+            // SCNBillboardConstraint has an unambiguous world-space reference frame.
+            // Tip positions in root-local space:
+            //   X wrapper: eulerAngles(0,0,-π/2) maps wrapper-Y → root-X+
+            //   Y wrapper: no rotation            maps wrapper-Y → root-Y+
+            //   Z wrapper: eulerAngles(π/2,0,0)  maps wrapper-Y → root-Z+
+            let tipDist = Float(length) + Float(radius) * 5   // ≈ 0.16 m past origin
+            let labelScale: Float = 0.003                      // 10 pt × 0.003 ≈ 3 cm
+            let labelInfos: [(String, NSColor, SCNVector3)] = [
+                ("X", .red,   SCNVector3(tipDist,  0,        0)),
+                ("Y", .green, SCNVector3(0,         tipDist,  0)),
+                ("Z", .blue,  SCNVector3(0,         0,        tipDist))
+            ]
+            for (str, color, pos) in labelInfos {
+                let text = SCNText(string: str, extrusionDepth: 0)
+                text.font = NSFont.boldSystemFont(ofSize: 10)
+                text.flatness = 0.1
+                text.firstMaterial?.diffuse.contents = color
+                text.firstMaterial?.emission.contents = color
+                text.firstMaterial?.isDoubleSided = true
+
+                let labelNode = SCNNode(geometry: text)
+                labelNode.scale = SCNVector3(labelScale, labelScale, labelScale)
+                // Shift left by ~half a glyph width to visually centre the letter.
+                labelNode.position = SCNVector3(pos.x - 0.012, pos.y, pos.z)
+                let bb = SCNBillboardConstraint()
+                bb.freeAxes = .all
+                labelNode.constraints = [bb]
+                root.addChildNode(labelNode)
+            }
 
             scene.rootNode.addChildNode(root)
             gizmoNode = root
