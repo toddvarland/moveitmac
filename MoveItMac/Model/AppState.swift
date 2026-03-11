@@ -92,6 +92,9 @@ final class AppState: ObservableObject {
     // ── Obstacles ──────────────────────────────────────────────────────────
     @Published var obstacles: [Obstacle] = []
 
+    // ── Setup (planning groups, ACM) ──────────────────────────────────────
+    @Published var robotSetup: RobotSetup = .empty
+
     // ── Collision ─────────────────────────────────────────────────────────
     /// Updated at ~120 Hz by the scene-view timer; publishes only when the
     /// set of colliding links actually changes (cheap equality guard).
@@ -118,6 +121,8 @@ final class AppState: ObservableObject {
     /// RRT trajectory: sequence of joint-angle configs from start → goal.
     /// Not @Published — read directly by the playback timer.
     var trajectory: [[String: Double]] = []
+    /// Time-parameterized version of `trajectory`; set after planning succeeds.
+    var timedTrajectory: TimedTrajectory? = nil
 
     /// Captured start / goal configurations for the planner.
     var planStart: [String: Double] = [:]
@@ -143,9 +148,12 @@ final class AppState: ObservableObject {
         plannerMessage = "Planning…"
         trajectory     = []
 
-        let startCfg = planStart.isEmpty ? jointAngles : planStart
-        let goalCfg  = planGoal
-        let obsCopy  = obstacles
+        let startCfg  = planStart.isEmpty ? jointAngles : planStart
+        let goalCfg   = planGoal
+        let obsCopy   = obstacles
+        let setupCopy = robotSetup
+        // If an active planning group is configured, plan only over its joints.
+        let groupJoints: [String]? = setupCopy.activeGroup.map { $0.joints }
 
         planningTask?.cancel()
         planningTask = Task.detached(priority: .userInitiated) { [weak self] in
@@ -153,18 +161,27 @@ final class AppState: ObservableObject {
                 model:  model,
                 start:  startCfg,
                 goal:   goalCfg,
+                joints: groupJoints,
                 isCollisionFree: { angles in
                     let fk = ForwardKinematics.compute(model: model, jointAngles: angles)
-                    let cr = CollisionChecker.check(model: model, fkResult: fk, obstacles: obsCopy)
+                    let cr = CollisionChecker.check(model: model, fkResult: fk,
+                                                    obstacles: obsCopy,
+                                                    disabledPairs: setupCopy.disabledCollisions)
                     return !cr.hasCollision
                 }
             )
+            // Time-parameterize on the background thread before returning.
+            let timed: TimedTrajectory? = result.success
+                ? TimeParameterization.apply(path: result.path, model: model)
+                : nil
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                self.trajectory     = result.path
-                self.plannerStatus  = result.success ? .done : .failed
-                self.plannerMessage = result.success
-                    ? "Found path: \(result.path.count) waypoints (\(result.iterations) iters)"
+                self.trajectory        = result.path
+                self.timedTrajectory   = timed
+                self.plannerStatus     = result.success ? .done : .failed
+                let dur = timed.map { String(format: "  (%.1f s)", $0.duration) } ?? ""
+                self.plannerMessage    = result.success
+                    ? "Found path: \(result.path.count) waypoints\(dur)"
                     : "No path found (\(result.iterations) iters)"
             }
         }
@@ -191,7 +208,7 @@ final class AppState: ObservableObject {
 
     func playPause() {
         guard canPlay else { return }
-        if playbackProgress >= 1.0 { playbackProgress = 0.0 }   // rewind if at end
+        if playbackProgress >= 1.0 { playbackProgress = 0.0 }
         isPlaying.toggle()
         if isPlaying { startPlaybackTimer() } else { stopPlaybackTimer() }
     }
@@ -202,19 +219,36 @@ final class AppState: ObservableObject {
     }
 
     private func applyTrajectoryFrame() {
-        guard !trajectory.isEmpty else { return }
-        jointAngles = trajectory[playbackIndex]
+        if let timed = timedTrajectory {
+            let t = playbackProgress * timed.duration
+            jointAngles = timed.angles(at: t)
+        } else if !trajectory.isEmpty {
+            jointAngles = trajectory[playbackIndex]
+        }
     }
 
     private var playbackTimer: Timer?
+    private var playbackLastFire: Date = .now
 
     private func startPlaybackTimer() {
         playbackTimer?.invalidate()
+        playbackLastFire = .now
         playbackTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            guard let self, self.isPlaying, self.trajectory.count > 1 else { return }
-            // Advance progress by (speed / count) per frame so total duration = count/speed seconds.
-            let step = self.playbackSpeed / (Double(self.trajectory.count - 1) * 60.0)
-            self.playbackProgress += step
+            guard let self, self.isPlaying else { return }
+            let now       = Date.now
+            let elapsed   = now.timeIntervalSince(self.playbackLastFire)
+            self.playbackLastFire = now
+
+            if let timed = self.timedTrajectory, timed.duration > 0 {
+                // Advance in real time, scaled by playbackSpeed.
+                let step = elapsed * self.playbackSpeed / timed.duration
+                self.playbackProgress += step
+            } else {
+                // Fallback: uniform step over waypoints.
+                let count = max(self.trajectory.count - 1, 1)
+                self.playbackProgress += elapsed * self.playbackSpeed / Double(count)
+            }
+
             if self.playbackProgress >= 1.0 {
                 self.playbackProgress = 1.0
                 self.isPlaying = false
@@ -259,6 +293,7 @@ final class AppState: ObservableObject {
     private func setRobotModel(_ model: RobotModel) {
         robotModel = model
         robotModelRevision += 1
+        robotSetup = .empty   // clear previous setup when a new robot is loaded
         // Initialise all actuated joints to their midpoint (or 0 if no limits)
         jointAngles = model.joints.values
             .filter { $0.isActuated }

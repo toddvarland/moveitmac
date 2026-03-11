@@ -44,7 +44,8 @@ enum CollisionChecker {
     static func check(
         model: RobotModel,
         fkResult: FKResult,
-        obstacles: [Obstacle]
+        obstacles: [Obstacle],
+        disabledPairs: [DisabledCollisionPair] = []
     ) -> CollisionResult {
 
         // Build world-space bounding sphere for every link.
@@ -63,17 +64,24 @@ enum CollisionChecker {
         }
 
         let adjacent = adjacentPairs(model)
+
+        // Build a fast lookup set from the ACM disabled pairs.
+        let disabledSet: Set<CollisionPair> = Set(disabledPairs.map {
+            CollisionPair($0.link1, $0.link2)
+        })
+
         var selfCols: [CollisionPair] = []
         var obsHits:  [ObstacleHit]  = []
         var hitting   = Set<String>()
 
-        // Self-collision: O(n²) sphere-sphere, skip directly-connected links.
+        // Self-collision: O(n²) sphere-sphere, skip adjacent and ACM-disabled links.
         for i in 0 ..< spheres.count {
             for j in (i + 1) ..< spheres.count {
                 let a = spheres[i]; let b = spheres[j]
-                guard !adjacent.contains(CollisionPair(a.name, b.name)) else { continue }
+                let pair = CollisionPair(a.name, b.name)
+                guard !adjacent.contains(pair) && !disabledSet.contains(pair) else { continue }
                 if simd_length(a.center - b.center) < a.radius + b.radius {
-                    selfCols.append(CollisionPair(a.name, b.name))
+                    selfCols.append(pair)
                     hitting.insert(a.name); hitting.insert(b.name)
                 }
             }

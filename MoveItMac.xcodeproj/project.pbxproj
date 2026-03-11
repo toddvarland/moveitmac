@@ -15,6 +15,8 @@
 		8DE265B27E4EC5427200043F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A46978B94B5E0E3F7129EE /* ContentView.swift */; };
 		967CC82A5F2F38D68E7FCF13 /* JointSliderPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5691490671643F2A5CFE5B00 /* JointSliderPanel.swift */; };
 		AA00BB11CC22DD33EE44FF55 /* CollisionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */; };
+		BB11CC22DD33EE44FF55AA00 /* RobotSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF00 /* RobotSetup.swift */; };
+		CC22DD33EE44FF55AA00BB11 /* SetupAssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB22CC33DD44EE55FF00AA11 /* SetupAssistantView.swift */; };
 		C6C1E23CEB9CD82A4BD42C77 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ADAE6E03B6D18F3D9133D54 /* AppState.swift */; };
 		DB0E1DAEE69D32642850A043 /* RobotSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F8110B62A8CAF77652E92B0 /* RobotSceneView.swift */; };
 /* End PBXBuildFile section */
@@ -38,6 +40,8 @@
 		5CE570FD79AD45C650110A52 /* MoveItMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MoveItMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6ADAE6E03B6D18F3D9133D54 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollisionChecker.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF00 /* RobotSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotSetup.swift; sourceTree = "<group>"; };
+		BB22CC33DD44EE55FF00AA11 /* SetupAssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupAssistantView.swift; sourceTree = "<group>"; };
 		6E033E2C0E4AF5C175B818B1 /* MoveItMacTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveItMacTests.swift; sourceTree = "<group>"; };
 		99D3401BB4B1EE93F7507C75 /* MoveItMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MoveItMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B05B9934C4F94D10580A431F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -107,6 +111,7 @@
 			children = (
 				6ADAE6E03B6D18F3D9133D54 /* AppState.swift */,
 				FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */,
+				AA11BB22CC33DD44EE55FF00 /* RobotSetup.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -125,6 +130,7 @@
 				07A46978B94B5E0E3F7129EE /* ContentView.swift */,
 				5691490671643F2A5CFE5B00 /* JointSliderPanel.swift */,
 				4F8110B62A8CAF77652E92B0 /* RobotSceneView.swift */,
+				BB22CC33DD44EE55FF00AA11 /* SetupAssistantView.swift */,
 				F027CABC972E309B6FDFAF52 /* SidebarView.swift */,
 			);
 			path = Views;
@@ -239,10 +245,12 @@
 			files = (
 				C6C1E23CEB9CD82A4BD42C77 /* AppState.swift in Sources */,
 				AA00BB11CC22DD33EE44FF55 /* CollisionChecker.swift in Sources */,
+				BB11CC22DD33EE44FF55AA00 /* RobotSetup.swift in Sources */,
 				8DE265B27E4EC5427200043F /* ContentView.swift in Sources */,
 				967CC82A5F2F38D68E7FCF13 /* JointSliderPanel.swift in Sources */,
 				42979DB914E9F506FA8E6F58 /* MoveItMacApp.swift in Sources */,
 				DB0E1DAEE69D32642850A043 /* RobotSceneView.swift in Sources */,
+				CC22DD33EE44FF55AA00BB11 /* SetupAssistantView.swift in Sources */,
 				3BAB39BBE99D545294E1E9AB /* SidebarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

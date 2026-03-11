@@ -35,6 +35,8 @@ public enum RRTPlanner {
     ///   - model:             Robot model (joint names and limits only).
     ///   - start:             Start configuration.
     ///   - goal:              Goal configuration.
+    ///   - joints:            Optional subset of joint names to plan over (planning group).
+    ///                        Defaults to all actuated joints when nil.
     ///   - isCollisionFree:   Closure returning `true` iff a config is valid.
     ///   - maxIterations:     RRT grow iterations (default 5 000).
     ///   - stepSize:          Max normalised step per iteration (default 0.1 ≈ 10% of range).
@@ -44,6 +46,7 @@ public enum RRTPlanner {
         model:             RobotModel,
         start:             [String: Double],
         goal:              [String: Double],
+        joints:            [String]? = nil,
         isCollisionFree:   ([String: Double]) -> Bool,
         maxIterations:     Int    = 5_000,
         stepSize:          Double = 0.1,
@@ -51,7 +54,7 @@ public enum RRTPlanner {
         connectTolerance:  Double = 0.05
     ) -> Result {
 
-        let joints = model.orderedActuatedJointNames
+        let joints = joints ?? model.orderedActuatedJointNames
         guard !joints.isEmpty else {
             return Result(path: [], iterations: 0, success: false)
         }
@@ -71,7 +74,8 @@ public enum RRTPlanner {
         if dist(start, goal, joints: joints, ranges: ranges) < connectTolerance {
             let smoothed = smooth([start, goal],
                                   joints: joints, ranges: ranges,
-                                  isCollisionFree: isCollisionFree)
+                                  isCollisionFree: isCollisionFree,
+                                  stepSize: stepSize)
             return Result(path: smoothed, iterations: 0, success: true)
         }
 
@@ -118,7 +122,8 @@ public enum RRTPlanner {
 
                 let smoothed = smooth(raw,
                                       joints: joints, ranges: ranges,
-                                      isCollisionFree: isCollisionFree)
+                                      isCollisionFree: isCollisionFree,
+                                      stepSize: stepSize)
                 return Result(path: smoothed, iterations: iter + 1, success: true)
             }
 
@@ -201,7 +206,7 @@ public enum RRTPlanner {
         joints:          [String],
         ranges:          [Double],
         isCollisionFree: ([String: Double]) -> Bool,
-        checkSteps:      Int = 10
+        stepSize:        Double
     ) -> [[String: Double]] {
         guard path.count > 2 else { return path }
         var result = path
@@ -212,8 +217,9 @@ public enum RRTPlanner {
             while i + 2 < result.count {
                 if isDirectSegmentFree(result[i], result[i + 2],
                                        joints: joints,
+                                       ranges: ranges,
                                        isCollisionFree: isCollisionFree,
-                                       checkSteps: checkSteps)
+                                       stepSize: stepSize)
                 {
                     result.remove(at: i + 1)
                     improved = true
@@ -227,13 +233,18 @@ public enum RRTPlanner {
     }
 
     /// Returns true iff the straight-line segment from `a` to `b` in joint
-    /// space is entirely collision-free (sampled at `checkSteps` equal intervals).
+    /// space is entirely collision-free.
+    /// Step count is derived from segment length so there is at most
+    /// `stepSize / 10` normalised distance between consecutive checks.
     private static func isDirectSegmentFree(
         _ a: [String: Double], _ b: [String: Double],
         joints:          [String],
+        ranges:          [Double],
         isCollisionFree: ([String: Double]) -> Bool,
-        checkSteps:      Int
+        stepSize:        Double
     ) -> Bool {
+        let segLen = dist(a, b, joints: joints, ranges: ranges)
+        let checkSteps = max(1, Int((segLen / (stepSize * 0.1)).rounded(.up)))
         for k in 1 ... checkSteps {
             let t = Double(k) / Double(checkSteps)
             var q: [String: Double] = [:]

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @State private var showSetupAssistant = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
@@ -15,10 +16,7 @@ struct ContentView: View {
                         EmptySceneOverlay()
                     }
                 }
-                .overlay(alignment: .bottomLeading) {
-                    AxisLegend()
-                        .padding(10)
-                }
+
         } detail: {
             JointSliderPanel()
                 .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 320)
@@ -29,6 +27,16 @@ struct ContentView: View {
                     appState.openURDFPanel()
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Setup Assistant", systemImage: "slider.horizontal.3") {
+                    showSetupAssistant = true
+                }
+                .disabled(!appState.isRobotLoaded)
+            }
+        }
+        .sheet(isPresented: $showSetupAssistant) {
+            SetupAssistantView(isPresented: $showSetupAssistant)
+                .environmentObject(appState)
         }
     }
 }
@@ -45,25 +53,3 @@ private struct EmptySceneOverlay: View {
     }
 }
 
-private struct AxisLegend: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            legendRow(color: .red,   label: "X")
-            legendRow(color: .green, label: "Y")
-            legendRow(color: .blue,  label: "Z")
-        }
-        .padding(8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func legendRow(color: Color, label: String) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(color)
-                .frame(width: 18, height: 4)
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(color)
-        }
-    }
-}

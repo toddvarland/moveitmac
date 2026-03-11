@@ -103,7 +103,7 @@ struct SidebarView: View {
                     HStack {
                         Text("Speed")
                             .font(.caption)
-                        Slider(value: $appState.playbackSpeed, in: 0.5...20,
+                        Slider(value: $appState.playbackSpeed, in: 0.1...5,
                                label: { EmptyView() })
                         Text(String(format: "%.1f×", appState.playbackSpeed))
                             .font(.caption.monospacedDigit())
@@ -112,9 +112,16 @@ struct SidebarView: View {
 
                     let idx   = appState.playbackIndex
                     let total = max(appState.trajectory.count - 1, 1)
-                    Text("Waypoint \(idx + 1) / \(total + 1)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let dur = appState.timedTrajectory?.duration {
+                        let remaining = dur / max(appState.playbackSpeed, 0.01) * (1.0 - appState.playbackProgress)
+                        Text(String(format: "%.1f s total  •  %.1f s left", dur, remaining))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Waypoint \(idx + 1) / \(total + 1)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -159,6 +166,11 @@ struct SidebarView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
                 }
+            }
+            Section("Axes") {
+                AxisLegendRow(color: .red,   label: "X")
+                AxisLegendRow(color: .green, label: "Y")
+                AxisLegendRow(color: .blue,  label: "Z")
             }
         }
         .listStyle(.sidebar)
@@ -224,9 +236,9 @@ private struct AddObstacleSheet: View {
 
             GroupBox("Position (m)") {
                 VStack(spacing: 6) {
-                    LabeledSlider(label: "X", value: $x, range: -2...2)
-                    LabeledSlider(label: "Y", value: $y, range: -2...2)
-                    LabeledSlider(label: "Z", value: $z, range:  0...2)
+                    LabeledSlider(label: "X", value: $x, range: -2...2, color: .red)
+                    LabeledSlider(label: "Y", value: $y, range: -2...2, color: .blue)
+                    LabeledSlider(label: "Z", value: $z, range:  0...2, color: .green)
                 }
             }
 
@@ -276,17 +288,33 @@ private struct AddObstacleSheet: View {
     }
 }
 
+private struct AxisLegendRow: View {
+    let color: Color
+    let label: String
+    var body: some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 18, height: 4)
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(color)
+        }
+    }
+}
+
 private struct LabeledSlider: View {
     let label: String
     @Binding var value: Double
     let range: ClosedRange<Double>
+    var color: Color? = nil
 
     var body: some View {
         HStack {
             Text(label)
                 .frame(width: 16)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.bold())
+                .foregroundStyle(color ?? .secondary)
             Slider(value: $value, in: range)
             Text(String(format: "%.2f", value))
                 .font(.caption.monospacedDigit())

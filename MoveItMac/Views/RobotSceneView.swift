@@ -53,7 +53,8 @@ struct RobotSceneView: NSViewRepresentable {
             let collision: CollisionResult
             if let model = state.robotModel, let fk = state.fkResult {
                 collision = CollisionChecker.check(model: model, fkResult: fk,
-                                                   obstacles: state.obstacles)
+                                                   obstacles: state.obstacles,
+                                                   disabledPairs: state.robotSetup.disabledCollisions)
             } else {
                 collision = .clear
             }
@@ -138,7 +139,7 @@ struct RobotSceneView: NSViewRepresentable {
             // Floor — SCNFloor is broken on modern macOS/Metal (FloorPass graph error).
             // Use a large SCNPlane rotated flat instead.
             let plane = SCNPlane(width: 10, height: 10)
-            plane.firstMaterial?.diffuse.contents = NSColor(calibratedWhite: 0.18, alpha: 1)
+            plane.firstMaterial?.diffuse.contents = makeFloorGridTexture()
             plane.firstMaterial?.isDoubleSided = true
             let floorNode = SCNNode(geometry: plane)
             floorNode.eulerAngles.x = -.pi / 2
@@ -201,6 +202,14 @@ struct RobotSceneView: NSViewRepresentable {
         private var dragStartScreen: CGPoint = .zero
         /// IK target position when the drag started (URDF frame)
         private var dragStartTargetPos: SIMD3<Double> = .zero
+
+        // ── Obstacle drag state ───────────────────────────────────────────────
+        private var draggingObstacleID: UUID?  = nil
+        /// SceneKit Y of the horizontal plane on which the obstacle is dragged.
+        private var dragObs_planeY:  Float  = 0
+        /// Offset (URDF X,Y) from obstacle centre to the initial ray-plane hit.
+        private var dragObs_offsetX: Double = 0
+        private var dragObs_offsetY: Double = 0
         /// Reference to the SCNView (set in makeNSView, used for hit-testing)
         weak var scnView: SCNView?
 
@@ -409,38 +418,78 @@ struct RobotSceneView: NSViewRepresentable {
             root.isHidden = true
         }
 
-        // MARK: Mouse events (IK gizmo drag)
+        // MARK: Mouse events (IK gizmo drag + obstacle drag)
 
         func handleMouseDown(event: NSEvent) {
-            guard let sv = scnView,
-                  let state = appState, state.useIK else { return }
-
+            guard let sv = scnView, let state = appState else { return }
             let loc = sv.convert(event.locationInWindow, from: nil)
             let hits = sv.hitTest(loc, options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
 
-            // Find the first hit whose node (or ancestor) is named "gizmo:N"
+            // ── 1. IK gizmo (only when IK is active) ────────────────────────
+            if state.useIK {
+                for hit in hits {
+                    var n: SCNNode? = hit.node
+                    while let node = n {
+                        if let name = node.name, name.hasPrefix("gizmo:"),
+                           let axisChar = name.last, let axis = Int(String(axisChar)) {
+                            draggingAxis = axis
+                            dragStartScreen = loc
+                            dragStartTargetPos = state.ikTarget.translation
+                            return
+                        }
+                        n = node.parent
+                    }
+                }
+            }
+            draggingAxis = -1
+
+            // ── 2. Obstacle grab ─────────────────────────────────────────────
             for hit in hits {
                 var n: SCNNode? = hit.node
                 while let node = n {
-                    if let name = node.name, name.hasPrefix("gizmo:"),
-                       let axisChar = name.last, let axis = Int(String(axisChar)) {
-                        draggingAxis = axis
-                        dragStartScreen = loc
-                        dragStartTargetPos = state.ikTarget.translation
+                    if let name = node.name, name.hasPrefix("obstacle:"),
+                       let uuidStr = name.components(separatedBy: ":").last,
+                       let uuid = UUID(uuidString: uuidStr),
+                       let idx = state.obstacles.firstIndex(where: { $0.id == uuid }) {
+                        let obs = state.obstacles[idx]
+                        // Horizontal drag plane at the obstacle's SceneKit Y (= URDF Z)
+                        let planeY = Float(obs.position.z)
+                        draggingObstacleID = uuid
+                        dragObs_planeY     = planeY
+                        if let hp = rayPlaneIntersect(screenPt: loc, planeY: planeY, in: sv) {
+                            dragObs_offsetX = Double(hp.x) - obs.position.x
+                            dragObs_offsetY = -Double(hp.z) - obs.position.y
+                        } else {
+                            dragObs_offsetX = 0; dragObs_offsetY = 0
+                        }
+                        // Brighten obstacle while dragging
+                        obstacleNodes[uuid]?.geometry?.firstMaterial?.diffuse.contents =
+                            NSColor.white.withAlphaComponent(0.9)
+                        sv.allowsCameraControl = false
                         return
                     }
                     n = node.parent
                 }
             }
-            draggingAxis = -1
         }
 
         func handleMouseDrag(event: NSEvent) {
-            guard draggingAxis >= 0,
-                  let sv = scnView,
-                  let state = appState else { return }
-
+            guard let sv = scnView, let state = appState else { return }
             let loc = sv.convert(event.locationInWindow, from: nil)
+
+            // ── Obstacle drag ────────────────────────────────────────────────
+            if let obsID = draggingObstacleID {
+                if let hp = rayPlaneIntersect(screenPt: loc, planeY: dragObs_planeY, in: sv),
+                   let idx = state.obstacles.firstIndex(where: { $0.id == obsID }) {
+                    state.obstacles[idx].position.x = Double(hp.x) - dragObs_offsetX
+                    state.obstacles[idx].position.y = -Double(hp.z) - dragObs_offsetY
+                }
+                return
+            }
+
+            // ── IK gizmo drag ────────────────────────────────────────────────
+            guard draggingAxis >= 0 else { return }
+
             let dx = Double(loc.x - dragStartScreen.x)
             let dy = Double(loc.y - dragStartScreen.y)
 
@@ -465,7 +514,30 @@ struct RobotSceneView: NSViewRepresentable {
         }
 
         func handleMouseUp(event: NSEvent) {
+            if let obsID = draggingObstacleID {
+                // Restore obstacle colour
+                obstacleNodes[obsID]?.geometry?.firstMaterial?.diffuse.contents =
+                    NSColor.systemOrange.withAlphaComponent(0.65)
+                scnView?.allowsCameraControl = true
+                draggingObstacleID = nil
+            }
             draggingAxis = -1
+        }
+
+        /// Project a screen point to 3-D by intersecting the camera ray with a
+        /// horizontal (constant SceneKit-Y) plane. Returns nil when the ray is
+        /// nearly parallel to the plane.
+        private func rayPlaneIntersect(screenPt: CGPoint,
+                                       planeY: Float,
+                                       in sv: SCNView) -> SIMD3<Float>? {
+            let near = sv.unprojectPoint(SCNVector3(screenPt.x, screenPt.y, 0))
+            let far  = sv.unprojectPoint(SCNVector3(screenPt.x, screenPt.y, 1))
+            let dy = Float(far.y - near.y)
+            guard abs(dy) > 1e-6 else { return nil }
+            let t = (planeY - Float(near.y)) / dy
+            return SIMD3<Float>(Float(near.x) + t * Float(far.x - near.x),
+                                planeY,
+                                Float(near.z) + t * Float(far.z - near.z))
         }
 
         // MARK: Update
@@ -695,4 +767,35 @@ struct RobotSceneView: NSViewRepresentable {
             return root
         }
     }
+}
+
+// MARK: - Floor grid texture
+
+/// Draws a dark floor tile with a white grid overlay.
+private func makeFloorGridTexture(textureSize: Int = 1024, cells: Int = 10) -> NSImage {
+    let img = NSImage(size: NSSize(width: textureSize, height: textureSize))
+    img.lockFocus()
+    defer { img.unlockFocus() }
+
+    // Background
+    NSColor(calibratedWhite: 0.18, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: textureSize, height: textureSize).fill()
+
+    // Grid lines
+    let path = NSBezierPath()
+    path.lineWidth = 1.5
+    NSColor(white: 1.0, alpha: 0.35).setStroke()
+    let step = CGFloat(textureSize) / CGFloat(cells)
+    for i in 0...cells {
+        let p = CGFloat(i) * step
+        // vertical
+        path.move(to: CGPoint(x: p, y: 0))
+        path.line(to: CGPoint(x: p, y: CGFloat(textureSize)))
+        // horizontal
+        path.move(to: CGPoint(x: 0, y: p))
+        path.line(to: CGPoint(x: CGFloat(textureSize), y: p))
+    }
+    path.stroke()
+
+    return img
 }
