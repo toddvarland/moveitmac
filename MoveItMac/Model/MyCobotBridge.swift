@@ -75,9 +75,16 @@ final class MyCobotBridge: ObservableObject {
         fd            = newFd
         connectedPort = port
         isConnected   = true
+
+        // Power on the servos so they accept angle commands.
+        sendFrame(cmd: 0x10, params: [])
     }
 
     func disconnect() {
+        if isConnected {
+            // Release torque before closing so the arm goes limp gracefully.
+            sendFrame(cmd: 0x13, params: [])
+        }
         guard fd >= 0 else { return }
         close(fd)
         fd            = -1
@@ -95,27 +102,29 @@ final class MyCobotBridge: ObservableObject {
     func sendAngles(_ radians: [Double], robotSpeed: Int) {
         guard isConnected, fd >= 0, radians.count >= 6 else { return }
 
-        // Fixed 18-byte frame.
-        var frame = [UInt8](repeating: 0, count: 18)
-        frame[0] = 0xFE
-        frame[1] = 0xFE
-        frame[2] = 0x0E           // LEN = 14
-        frame[3] = 0x20           // SET_ANGLES command
-
+        var params = [UInt8](repeating: 0, count: 13)   // 6 × int16 + 1 speed
         for i in 0 ..< 6 {
             let deg = radians[i] * (180.0 / .pi)
             let raw = Int((deg * 100).rounded())
                 .clamped(to: Int(Int16.min) ... Int(Int16.max))
             // Encode as big-endian two's complement int16.
             let encoded = raw >= 0 ? raw : raw + 65536
-            frame[4 + i * 2]     = UInt8(encoded >> 8)
-            frame[4 + i * 2 + 1] = UInt8(encoded & 0xFF)
+            params[i * 2]     = UInt8(encoded >> 8)
+            params[i * 2 + 1] = UInt8(encoded & 0xFF)
         }
+        params[12] = UInt8(robotSpeed.clamped(to: 1 ... 100))
+        sendFrame(cmd: 0x20, params: params)
+    }
 
-        frame[16] = UInt8(robotSpeed.clamped(to: 1 ... 100))
-        frame[17] = 0xFA
+    // MARK: - Frame encoder
 
-        // Non-blocking write — EAGAIN (kernel buffer full) silently drops the frame.
+    /// Encode and write a myCobot binary frame.
+    /// LEN = len(params) + 2  (CMD byte + footer byte), per pymycobot protocol.
+    private func sendFrame(cmd: UInt8, params: [UInt8]) {
+        guard fd >= 0 else { return }
+        var frame: [UInt8] = [0xFE, 0xFE, UInt8(params.count + 2), cmd]
+        frame.append(contentsOf: params)
+        frame.append(0xFA)
         frame.withUnsafeBytes { ptr in
             _ = Darwin.write(fd, ptr.baseAddress!, frame.count)
         }
