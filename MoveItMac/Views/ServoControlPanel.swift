@@ -9,6 +9,9 @@ struct ServoControlPanel: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var servo: ServoEngine
 
+    @State private var availablePorts: [String] = []
+    @State private var selectedPort:   String   = ""
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -23,27 +26,90 @@ struct ServoControlPanel: View {
             Divider()
             footer
         }
-        .frame(width: 340, height: 480)
+        .frame(width: 340, height: 540)
+        .onAppear  { rescanPorts() }
         .onDisappear { servo.clearCommands() }
     }
 
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
-            statusBadge
-            Spacer()
-            Picker("Mode", selection: $servo.mode) {
-                ForEach(ServoEngine.Mode.allCases, id: \.self) { m in
-                    Text(m.rawValue).tag(m)
+        VStack(spacing: 0) {
+            // Status + mode row
+            HStack(spacing: 12) {
+                statusBadge
+                Spacer()
+                Picker("Mode", selection: $servo.mode) {
+                    ForEach(ServoEngine.Mode.allCases, id: \.self) { m in
+                        Text(m.rawValue).tag(m)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 160)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider()
+            hardwareRow
+        }
+        .background(.bar)
+    }
+
+    // MARK: - Hardware Row
+
+    private var hardwareRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "cable.connector")
+                    .foregroundStyle(servo.bridge.isConnected ? .green : .secondary)
+                    .frame(width: 16)
+
+                Picker("Port", selection: $selectedPort) {
+                    Text("Select port…").tag("")
+                    ForEach(availablePorts, id: \.self) { port in
+                        Text(port.replacingOccurrences(of: "/dev/", with: "")).tag(port)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+
+                Button { rescanPorts() } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+
+                Button(servo.bridge.isConnected ? "Disconnect" : "Connect") {
+                    if servo.bridge.isConnected {
+                        servo.bridge.disconnect()
+                    } else if !selectedPort.isEmpty {
+                        servo.bridge.connect(to: selectedPort)
+                    }
+                }
+                .disabled(!servo.bridge.isConnected && selectedPort.isEmpty)
+                .buttonStyle(.bordered)
+                .tint(servo.bridge.isConnected ? .red : nil)
+            }
+            if let err = servo.bridge.lastError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+            }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.bar)
+        .padding(.vertical, 8)
+    }
+
+    private func rescanPorts() {
+        availablePorts = MyCobotBridge.availablePorts()
+        if selectedPort.isEmpty || !availablePorts.contains(selectedPort) {
+            // Prefer known myCobot USB-serial chip names (CP2104 / SLAB / FTDI)
+            selectedPort = availablePorts.first(where: {
+                $0.contains("usbserial") || $0.contains("SLAB") || $0.contains("usbmodem")
+            }) ?? availablePorts.first ?? ""
+        }
     }
 
     private var statusBadge: some View {

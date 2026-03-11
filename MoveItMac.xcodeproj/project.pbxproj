@@ -19,6 +19,7 @@
 		CC22DD33EE44FF55AA00BB11 /* SetupAssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB22CC33DD44EE55FF00AA11 /* SetupAssistantView.swift */; };
 		EE55FF66AA77BB88CC99DD00 /* ServoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF44EE55DD66CC77BB88AA99 /* ServoEngine.swift */; };
 		FF55AA66BB77CC88DD99EE00 /* ServoControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA44BB55CC66DD77EE88FF99 /* ServoControlPanel.swift */; };
+		DD44EE55FF66AA77BB88CC99 /* MyCobotBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC33DD44EE55FF66AA77BB88 /* MyCobotBridge.swift */; };
 		C6C1E23CEB9CD82A4BD42C77 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ADAE6E03B6D18F3D9133D54 /* AppState.swift */; };
 		DB0E1DAEE69D32642850A043 /* RobotSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F8110B62A8CAF77652E92B0 /* RobotSceneView.swift */; };
 /* End PBXBuildFile section */
@@ -46,6 +47,7 @@
 		BB22CC33DD44EE55FF00AA11 /* SetupAssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupAssistantView.swift; sourceTree = "<group>"; };
 		FF44EE55DD66CC77BB88AA99 /* ServoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServoEngine.swift; sourceTree = "<group>"; };
 		AA44BB55CC66DD77EE88FF99 /* ServoControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServoControlPanel.swift; sourceTree = "<group>"; };
+		CC33DD44EE55FF66AA77BB88 /* MyCobotBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCobotBridge.swift; sourceTree = "<group>"; };
 		6E033E2C0E4AF5C175B818B1 /* MoveItMacTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveItMacTests.swift; sourceTree = "<group>"; };
 		99D3401BB4B1EE93F7507C75 /* MoveItMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MoveItMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B05B9934C4F94D10580A431F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -115,6 +117,7 @@
 			children = (
 				6ADAE6E03B6D18F3D9133D54 /* AppState.swift */,
 				FF55EE44DD33CC22BB11AA00 /* CollisionChecker.swift */,
+				CC33DD44EE55FF66AA77BB88 /* MyCobotBridge.swift */,
 				AA11BB22CC33DD44EE55FF00 /* RobotSetup.swift */,
 				FF44EE55DD66CC77BB88AA99 /* ServoEngine.swift */,
 			);
@@ -259,6 +262,7 @@
 				CC22DD33EE44FF55AA00BB11 /* SetupAssistantView.swift in Sources */,
 				EE55FF66AA77BB88CC99DD00 /* ServoEngine.swift in Sources */,
 				FF55AA66BB77CC88DD99EE00 /* ServoControlPanel.swift in Sources */,
+				DD44EE55FF66AA77BB88CC99 /* MyCobotBridge.swift in Sources */,
 				3BAB39BBE99D545294E1E9AB /* SidebarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

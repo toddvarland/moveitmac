@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import simd
 import URDFKit
 
@@ -47,6 +48,20 @@ final class ServoEngine: ObservableObject {
 
     private var timer:    Timer?
     private weak var appState: AppState?
+    private var bridgeTick = 0
+    private var bridgeSink: AnyCancellable?
+
+    // MARK: - Hardware bridge (myCobot-280 M5)
+
+    /// Owned bridge instance.  Changes to bridge.isConnected propagate through
+    /// this engine's objectWillChange so ServoControlPanel refreshes automatically.
+    let bridge = MyCobotBridge()
+
+    init() {
+        bridgeSink = bridge.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
+    }
 
     private static let hz:           Double = 100.0
     private static let dt:           Double = 1.0 / hz
@@ -158,6 +173,14 @@ final class ServoEngine: ObservableObject {
             status = .halted
         } else {
             appState.jointAngles = candidate
+            // Forward joint angles to physical robot at 10 Hz (every 10th tick).
+            bridgeTick += 1
+            if bridgeTick % 10 == 0, bridge.isConnected {
+                let names  = model.orderedActuatedJointNames
+                let angles = Array(names.prefix(6).map { candidate[$0] ?? 0 })
+                let spd    = max(5, min(100, Int((speedScale * 50).rounded())))
+                bridge.sendAngles(angles, robotSpeed: spd)
+            }
         }
     }
 
