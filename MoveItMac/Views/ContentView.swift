@@ -23,6 +23,7 @@ struct ContentView: View {
             JointSliderPanel()
                 .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 320)
         }
+        .environmentObject(servo)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Load URDF…", systemImage: "plus.circle") {

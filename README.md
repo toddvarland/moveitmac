@@ -2,7 +2,7 @@
 
 A native macOS motion planning tool — a Swift/SwiftUI reimagination of [MoveIt2](https://github.com/moveit/moveit2), built for robotics students and researchers. No ROS installation required.
 
-> **Status:** Phase 1 scaffold — URDF parser + 3-D visualizer shell in progress.  
+> **Status:** Active development — URDF parser, 3-D visualizer, collision checking, IK, RRT motion planning, and myCobot 280-M5 hardware bridge all working.  
 > See [APPROACH.md](APPROACH.md) for the full architecture and build plan.
 
 ---
@@ -81,12 +81,56 @@ moveit-clone/
 
 | Phase | Status | Description |
 |---|---|---|
-| 1 | 🔨 In progress | URDF parser + SceneKit visualizer shell |
-| 2 | ⬜ Not started | Collision checking (FCL integration) |
-| 3 | ⬜ Not started | IK + end-effector drag (KDL) |
-| 4 | ⬜ Not started | Motion planning (OMPL + Pilz) |
-| 5 | ⬜ Not started | Setup Assistant wizard |
-| 6 | ⬜ Not started | Hardware bridge (optional) |
+| 1 | ✅ Done | URDF parser + SceneKit visualizer |
+| 2 | ✅ Done | Collision checking (FCL / self-collision ACM) |
+| 3 | ✅ Done | IK + forward kinematics (KDL) |
+| 4 | ✅ Done | Motion planning (RRT + time parameterization) |
+| 5 | ✅ Done | Setup Assistant wizard |
+| 6 | ✅ Done | Hardware bridge (myCobot 280-M5 USB serial) |
+
+---
+
+## Testing the Full Pipeline
+
+### 1. Basic Setup
+- Launch the app
+- In Setup Assistant, load `cobot.urdf` — robot name shows **myCobot280**
+- Confirm the 3D arm renders in the scene view
+
+### 2. Serial Connection
+- Connect the myCobot 280-M5 via USB
+- Select `/dev/cu.usbserial-52D20281481` in the connection picker and connect
+- Confirm the button toggles to **Disconnect**
+
+### 3. Physical → Virtual Mirroring
+- With the arm connected and idle, physically move the arm (or jog from the physical controller)
+- Confirm the virtual arm in the 3D view updates in real time (~5 Hz)
+
+### 4. Jogging
+- In Servo Control Panel, hold a +/− jog button for a joint
+- Confirm the physical arm moves and the UI angle value updates
+- Release — arm should stop
+
+### 5. Zero Pose
+- Press **Zero Pose**
+- Physical arm moves to all-zeros (straight up); virtual arm follows
+
+### 6. Trajectory Planning
+- Press **Set Start** — captures current joint angles as the start pose
+- Drag sliders or jog to a new goal position — virtual arm should **not** snap back
+- Press **Set Goal**
+- Press **Plan** — cyan EE path tube appears in the 3D view
+- Scrub the trajectory preview slider to verify the motion
+
+### 7. Execute on Robot
+- After a successful plan, press **Execute on Robot**
+- Physical arm moves through the planned trajectory at ~10 Hz
+- Virtual arm tracks along simultaneously
+
+### 8. Collision Avoidance
+- Move sliders into a self-collision configuration
+- Confirm the servo engine halts and shows a collision warning
+- Return to a clear pose — jogging resumes
 
 ---
 

@@ -183,11 +183,79 @@ final class AppState: ObservableObject {
                 self.plannerMessage    = result.success
                     ? "Found path: \(result.path.count) waypoints\(dur)"
                     : "No path found (\(result.iterations) iters)"
+                // Compute sampled EE path for 3-D visualization (up to 80 points).
+                if result.success, let model = self.robotModel {
+                    let tipLink = self.robotSetup.activeGroup?.tipLink
+                        ?? model.orderedActuatedJointNames.last.flatMap { model.joints[$0]?.childLinkName }
+                        ?? model.rootLinkName
+                    let path = result.path
+                    let step = max(1, path.count / 80)
+                    var ee: [SIMD3<Double>] = []
+                    for i in stride(from: 0, to: path.count, by: step) {
+                        let fk = ForwardKinematics.compute(model: model, jointAngles: path[i])
+                        ee.append(fk.position(of: tipLink))
+                    }
+                    if let last = path.last {
+                        let fk = ForwardKinematics.compute(model: model, jointAngles: last)
+                        ee.append(fk.position(of: tipLink))
+                    }
+                    self.trajectoryEEPath = ee
+                } else {
+                    self.trajectoryEEPath = []
+                }
             }
         }
     }
 
+    /// Sampled end-effector world positions along the planned trajectory (URDF frame).
+    /// Updated whenever `trajectory` changes. Read by RobotSceneView for path rendering.
+    @Published var trajectoryEEPath: [SIMD3<Double>] = []
+
     private var planningTask: Task<Void, Never>?
+
+    // ── Trajectory Execution ──────────────────────────────────────────────
+
+    @Published var isExecuting: Bool = false
+
+    /// Stream the current timed trajectory to the physical arm at ~10 Hz,
+    /// while also advancing the virtual arm and scrubber in real time.
+    func executeTrajectory(bridge: MyCobotBridge) {
+        guard let timed = timedTrajectory, timed.duration > 0,
+              let model = robotModel else { return }
+        isPlaying  = false
+        stopPlaybackTimer()
+        playbackProgress = 0
+        isExecuting = true
+
+        let names    = Array(model.orderedActuatedJointNames.prefix(6))
+        let duration = timed.duration
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard bridge.isConnected else { self.isExecuting = false; return }
+            let stepSeconds = 0.10   // 10 Hz
+            var t = 0.0
+            while t <= duration, self.isExecuting {
+                self.playbackProgress = min(t / duration, 1.0)
+                let a = timed.angles(at: t)
+                self.jointAngles = a
+                let angles6 = names.map { a[$0] ?? 0.0 }
+                for (i, angle) in angles6.enumerated() {
+                    bridge.sendAngle(jointIndex: i, radians: angle, robotSpeed: 80)
+                }
+                try? await Task.sleep(nanoseconds: UInt64(stepSeconds * 1_000_000_000))
+                t += stepSeconds
+            }
+            // Final frame at exactly t = duration.
+            self.playbackProgress = 1.0
+            let finalA = timed.angles(at: duration)
+            self.jointAngles = finalA
+            for (i, angle) in names.map({ finalA[$0] ?? 0.0 }).enumerated() {
+                bridge.sendAngle(jointIndex: i, radians: angle, robotSpeed: 80)
+            }
+            self.isExecuting = false
+        }
+    }
 
     // ── Trajectory Playback ───────────────────────────────────────────────
 
@@ -294,6 +362,8 @@ final class AppState: ObservableObject {
         robotModel = model
         robotModelRevision += 1
         robotSetup = .empty   // clear previous setup when a new robot is loaded
+        trajectory = []; timedTrajectory = nil; trajectoryEEPath = []
+        plannerStatus = .idle; plannerMessage = ""; planStart = [:]; planGoal = [:]
         // Auto-generate the ACM in the background so jogging doesn't halt on false positives.
         Task.detached(priority: .utility) { [weak self] in
             let pairs = ACMGenerator.compute(model: model)

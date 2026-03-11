@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var servo: ServoEngine
     @State private var addObstacleSheet = false
 
     var body: some View {
@@ -72,7 +73,7 @@ struct SidebarView: View {
                             )
                     }
 
-                    if appState.plannerStatus == .done {
+            if appState.plannerStatus == .done {
                         Button("Apply Goal") {
                             appState.jointAngles = appState.planGoal
                         }
@@ -81,7 +82,6 @@ struct SidebarView: View {
                 }
             }
 
-            // ── Playback ───────────────────────────────────────────────────
             if appState.canPlay {
                 Section("Trajectory") {
                     HStack {
@@ -119,6 +119,29 @@ struct SidebarView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         Text("Waypoint \(idx + 1) / \(total + 1)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Execute on physical arm
+                    Button {
+                        appState.executeTrajectory(bridge: servo.bridge)
+                    } label: {
+                        if appState.isExecuting {
+                            HStack(spacing: 6) {
+                                ProgressView().scaleEffect(0.65)
+                                Text("Executing…")
+                            }
+                        } else {
+                            Label("Execute on Robot", systemImage: "play.circle.fill")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .disabled(!servo.bridge.isConnected || appState.isExecuting)
+
+                    if !servo.bridge.isConnected {
+                        Text("Connect hardware in Servo panel to execute")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

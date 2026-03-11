@@ -95,6 +95,7 @@ struct RobotSceneView: NSViewRepresentable {
             c.snapshotUseIK           = state.useIK
             c.snapshotIKTarget        = state.ikTarget
             c.snapshotIKLink          = state.ikEndEffectorLink
+            c.snapshotTrajectoryPath  = state.trajectoryEEPath
             c.snapshotLock.unlock()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -166,6 +167,7 @@ struct RobotSceneView: NSViewRepresentable {
         override init() {
             super.init()
             scene.rootNode.addChildNode(obstacleContainerNode)
+            scene.rootNode.addChildNode(trajectoryPathNode)
         }
 
         // ── AppState reference (main thread only) ────────────────────────────────
@@ -185,6 +187,12 @@ struct RobotSceneView: NSViewRepresentable {
         var snapshotUseIK:           Bool = false
         var snapshotIKTarget:        simd_double4x4 = .identity
         var snapshotIKLink:          String = ""
+        var snapshotTrajectoryPath:  [SIMD3<Double>] = []
+
+        // ── Trajectory path node ───────────────────────────────────────────
+        private var trajectoryPathNode: SCNNode = {
+            let n = SCNNode(); n.name = "trajectoryPath"; return n
+        }()
 
         // ── Logging / throttle tracking ─────────────────────────────────────────
         var lastLogTime:             Date = .distantPast
@@ -228,6 +236,7 @@ struct RobotSceneView: NSViewRepresentable {
             let useIK           = snapshotUseIK
             let ikTarget        = snapshotIKTarget
             let ikLink          = snapshotIKLink
+            let trajectoryPath  = snapshotTrajectoryPath
             snapshotLock.unlock()
 
             // Throttled log — one line per second showing all joint angles.
@@ -262,6 +271,7 @@ struct RobotSceneView: NSViewRepresentable {
             updateObstacles(obstacles)
             updateCollisionTint(model: model, collidingLinks: collisionResult.collidingLinks)
             updateGizmo(useIK: useIK, ikTarget: ikTarget, ikLink: ikLink, model: model, angles: angles)
+            updateTrajectoryPath(trajectoryPath)
         }
 
         // ── Robot state ───────────────────────────────────────────────────────
@@ -349,6 +359,78 @@ struct RobotSceneView: NSViewRepresentable {
             jointNodes        = [:]
             gizmoNode?.removeFromParentNode()
             gizmoNode = nil
+        }
+
+        // MARK: Trajectory Path
+
+        /// Rebuild the EE polyline whenever the sampled path changes.
+        func updateTrajectoryPath(_ eePoints: [SIMD3<Double>]) {
+            // Remove previous path segments.
+            trajectoryPathNode.childNodes.forEach { $0.removeFromParentNode() }
+
+            guard eePoints.count >= 2 else {
+                if trajectoryPathNode.parent == nil {
+                    scene.rootNode.addChildNode(trajectoryPathNode)
+                }
+                return
+            }
+
+            if trajectoryPathNode.parent == nil {
+                scene.rootNode.addChildNode(trajectoryPathNode)
+            }
+
+            let color = NSColor.systemCyan.withAlphaComponent(0.85)
+            let tubeRadius: CGFloat = 0.004
+
+            // Convert URDF-frame points to SceneKit frame (Z-up → Y-up).
+            // URDF X→SCN X, URDF Y→SCN -Z, URDF Z→SCN Y
+            func scnPos(_ p: SIMD3<Double>) -> SCNVector3 {
+                SCNVector3(Float(p.x), Float(p.z), Float(-p.y))
+            }
+
+            for i in 0 ..< eePoints.count - 1 {
+                let a = scnPos(eePoints[i])
+                let b = scnPos(eePoints[i + 1])
+                let dx = Float(b.x) - Float(a.x)
+                let dy = Float(b.y) - Float(a.y)
+                let dz = Float(b.z) - Float(a.z)
+                let segLen = CGFloat(sqrt(dx*dx + dy*dy + dz*dz))
+                guard segLen > 1e-5 else { continue }
+
+                let tube = SCNCylinder(radius: tubeRadius, height: segLen)
+                tube.firstMaterial?.diffuse.contents = color
+                tube.firstMaterial?.emission.contents = color
+
+                let seg = SCNNode(geometry: tube)
+                // Position at midpoint.
+                seg.position = SCNVector3(Float(a.x) + dx/2, Float(a.y) + dy/2, Float(a.z) + dz/2)
+                // Orient along segment direction.
+                // SCNCylinder's axis is Y; we rotate Y to the direction vector.
+                let dir = simd_normalize(SIMD3<Float>(dx, dy, dz))
+                let yAxis = SIMD3<Float>(0, 1, 0)
+                let cross = simd_cross(yAxis, dir)
+                let dot   = simd_dot(yAxis, dir)
+                if simd_length(cross) < 1e-6 {
+                    // Parallel — no rotation needed (or flip 180°).
+                    if dot < 0 { seg.eulerAngles = SCNVector3(Float.pi, 0, 0) }
+                } else {
+                    let angle = acos(max(-1, min(1, dot)))
+                    seg.simdOrientation = simd_quaternion(angle, simd_normalize(cross))
+                }
+                trajectoryPathNode.addChildNode(seg)
+            }
+
+            // Draw sphere markers at start and goal.
+            for (idx, point) in [eePoints.first!, eePoints.last!].enumerated() {
+                let sphere = SCNSphere(radius: tubeRadius * 3)
+                sphere.firstMaterial?.diffuse.contents = idx == 0
+                    ? NSColor.systemGreen.withAlphaComponent(0.9)
+                    : NSColor.systemRed.withAlphaComponent(0.9)
+                sphere.firstMaterial?.emission.contents = sphere.firstMaterial?.diffuse.contents
+                let node = SCNNode(geometry: sphere)
+                node.position = scnPos(point)
+                trajectoryPathNode.addChildNode(node)
+            }
         }
 
         // MARK: IK Gizmo

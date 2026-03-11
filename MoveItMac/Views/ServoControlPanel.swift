@@ -33,8 +33,13 @@ struct ServoControlPanel: View {
         .onAppear  { rescanPorts() }
         .onDisappear { servo.clearCommands() }
         .onReceive(feedbackClock) { _ in
-            // Mirror physical arm angles into the virtual model when not jogging.
-            guard servo.bridge.isConnected, servo.status == .idle else { return }
+            // Mirror physical arm → virtual model when idle and no planning session is active.
+            // Suspend polling once the user has set a start/goal so that manually positioning
+            // the virtual arm (via sliders) isn't overwritten by readback every 200 ms.
+            guard servo.bridge.isConnected,
+                  servo.status == .idle,
+                  appState.planStart.isEmpty,
+                  appState.plannerStatus == .idle else { return }
             servo.bridge.pollAngles { angles in
                 guard let angles, let model = appState.robotModel else { return }
                 let names = model.orderedActuatedJointNames
