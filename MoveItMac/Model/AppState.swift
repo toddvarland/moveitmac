@@ -172,6 +172,63 @@ final class AppState: ObservableObject {
 
     private var planningTask: Task<Void, Never>?
 
+    // ── Trajectory Playback ───────────────────────────────────────────────
+
+    @Published var isPlaying:         Bool    = false
+    /// Current scrubber position 0.0–1.0 (driven by timer or user drag).
+    @Published var playbackProgress:  Double  = 0.0
+    /// Playback speed: waypoints per second.
+    @Published var playbackSpeed:     Double  = 5.0
+
+    var canPlay: Bool { !trajectory.isEmpty }
+
+    /// Index into `trajectory` corresponding to `playbackProgress`.
+    var playbackIndex: Int {
+        guard trajectory.count > 1 else { return 0 }
+        let i = Int((playbackProgress * Double(trajectory.count - 1)).rounded())
+        return max(0, min(i, trajectory.count - 1))
+    }
+
+    func playPause() {
+        guard canPlay else { return }
+        if playbackProgress >= 1.0 { playbackProgress = 0.0 }   // rewind if at end
+        isPlaying.toggle()
+        if isPlaying { startPlaybackTimer() } else { stopPlaybackTimer() }
+    }
+
+    func scrubTo(_ progress: Double) {
+        playbackProgress = max(0, min(1, progress))
+        applyTrajectoryFrame()
+    }
+
+    private func applyTrajectoryFrame() {
+        guard !trajectory.isEmpty else { return }
+        jointAngles = trajectory[playbackIndex]
+    }
+
+    private var playbackTimer: Timer?
+
+    private func startPlaybackTimer() {
+        playbackTimer?.invalidate()
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            guard let self, self.isPlaying, self.trajectory.count > 1 else { return }
+            // Advance progress by (speed / count) per frame so total duration = count/speed seconds.
+            let step = self.playbackSpeed / (Double(self.trajectory.count - 1) * 60.0)
+            self.playbackProgress += step
+            if self.playbackProgress >= 1.0 {
+                self.playbackProgress = 1.0
+                self.isPlaying = false
+                self.stopPlaybackTimer()
+            }
+            self.applyTrajectoryFrame()
+        }
+    }
+
+    private func stopPlaybackTimer() {
+        playbackTimer?.invalidate()
+        playbackTimer = nil
+    }
+
     // MARK: - Actions
 
     /// Opens a file-open panel and loads the selected URDF.

@@ -81,6 +81,43 @@ struct SidebarView: View {
                 }
             }
 
+            // ── Playback ───────────────────────────────────────────────────
+            if appState.canPlay {
+                Section("Trajectory") {
+                    HStack {
+                        Button {
+                            appState.playPause()
+                        } label: {
+                            Image(systemName: appState.isPlaying ? "pause.fill" : "play.fill")
+                                .frame(width: 24)
+                        }
+                        .buttonStyle(.bordered)
+                        .keyboardShortcut(.space, modifiers: [])
+
+                        Slider(value: Binding(
+                            get: { appState.playbackProgress },
+                            set: { appState.scrubTo($0) }
+                        ))
+                    }
+
+                    HStack {
+                        Text("Speed")
+                            .font(.caption)
+                        Slider(value: $appState.playbackSpeed, in: 0.5...20,
+                               label: { EmptyView() })
+                        Text(String(format: "%.1f×", appState.playbackSpeed))
+                            .font(.caption.monospacedDigit())
+                            .frame(width: 38, alignment: .trailing)
+                    }
+
+                    let idx   = appState.playbackIndex
+                    let total = max(appState.trajectory.count - 1, 1)
+                    Text("Waypoint \(idx + 1) / \(total + 1)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             // ── IK ─────────────────────────────────────────────────────────
             if appState.isRobotLoaded {
                 Section("Inverse Kinematics") {
