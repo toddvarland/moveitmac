@@ -372,7 +372,7 @@ struct RobotSceneView: NSViewRepresentable {
             let root = SCNNode()
             root.name = "ik_gizmo"
 
-            func axisHandle(color: NSColor, axis: Int) -> SCNNode {
+            func axisHandle(color: NSColor, axis: Int, label: String) -> SCNNode {
                 let length: CGFloat = 0.12
                 let radius: CGFloat = 0.008
                 // Shaft
@@ -389,13 +389,29 @@ struct RobotSceneView: NSViewRepresentable {
                 tip.position = SCNVector3(0, Float(length / 2 + radius * 2.5), 0)
                 shaft.addChildNode(tip)
 
+                // Text label at the tip — single character, fixed-offset centering.
+                let text = SCNText(string: label, extrusionDepth: 0)
+                text.font = NSFont.boldSystemFont(ofSize: 0.03)
+                text.flatness = 0.01
+                text.firstMaterial?.diffuse.contents = color
+                text.firstMaterial?.emission.contents = color.withAlphaComponent(0.8)
+                text.firstMaterial?.isDoubleSided = true
+                let textNode = SCNNode(geometry: text)
+                // Approx half-width of a 0.03-pt bold glyph to visually centre it.
+                let halfGlyph: Float = 0.010
+                let tipOffset: Float = Float(length) / 2 + Float(radius) * 7
+                textNode.position = SCNVector3(-halfGlyph, tipOffset, -halfGlyph)
+                // Billboard so the label always faces the camera.
+                textNode.constraints = [SCNBillboardConstraint()]
+                shaft.addChildNode(textNode)
+
                 // Rotate the Y-axis shaft onto the correct world axis.
                 let wrapper = SCNNode()
                 wrapper.name = "gizmo:\(axis)"
                 switch axis {
                 case 0: // X — rotate -90° around Z
                     wrapper.eulerAngles = SCNVector3(0, 0, -Float.pi / 2)
-                case 2: // Z — rotate +90° around X (SCN Z is URDF -Y; handled in transform)
+                case 2: // Z — rotate +90° around X
                     wrapper.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
                 default: break   // Y — no rotation needed
                 }
@@ -405,9 +421,9 @@ struct RobotSceneView: NSViewRepresentable {
                 return wrapper
             }
 
-            root.addChildNode(axisHandle(color: .red,   axis: 0))  // X
-            root.addChildNode(axisHandle(color: .green, axis: 1))  // Y
-            root.addChildNode(axisHandle(color: .blue,  axis: 2))  // Z
+            root.addChildNode(axisHandle(color: .red,   axis: 0, label: "X"))  // X
+            root.addChildNode(axisHandle(color: .green, axis: 1, label: "Y"))  // Y
+            root.addChildNode(axisHandle(color: .blue,  axis: 2, label: "Z"))  // Z
 
             scene.rootNode.addChildNode(root)
             gizmoNode = root
