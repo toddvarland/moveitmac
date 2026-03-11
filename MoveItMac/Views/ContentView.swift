@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var servo = ServoEngine()
     @State private var showSetupAssistant = false
+    @State private var showServoPanel     = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
@@ -32,6 +34,17 @@ struct ContentView: View {
                     showSetupAssistant = true
                 }
                 .disabled(!appState.isRobotLoaded)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Servo", systemImage: "waveform.path") {
+                    showServoPanel.toggle()
+                }
+                .tint(servo.status == .running ? .green : nil)
+                .disabled(!appState.isRobotLoaded)
+                .popover(isPresented: $showServoPanel, arrowEdge: .top) {
+                    ServoControlPanel(servo: servo)
+                        .environmentObject(appState)
+                }
             }
         }
         .sheet(isPresented: $showSetupAssistant) {

@@ -1,0 +1,282 @@
+import SwiftUI
+import URDFKit
+
+// MARK: - Servo Control Panel
+
+/// Non-blocking popover panel for real-time servo jogging.
+/// Displayed as a toolbar popover so the 3-D viewport remains visible.
+struct ServoControlPanel: View {
+    @EnvironmentObject var appState: AppState
+    @ObservedObject var servo: ServoEngine
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            Group {
+                switch servo.mode {
+                case .joint:     jointControls
+                case .cartesian: cartesianControls
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Divider()
+            footer
+        }
+        .frame(width: 340, height: 480)
+        .onDisappear { servo.clearCommands() }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            statusBadge
+            Spacer()
+            Picker("Mode", selection: $servo.mode) {
+                ForEach(ServoEngine.Mode.allCases, id: \.self) { m in
+                    Text(m.rawValue).tag(m)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 160)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private var statusBadge: some View {
+        HStack(spacing: 5) {
+            Circle().fill(statusColor).frame(width: 8, height: 8)
+            Text(statusLabel)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(statusColor)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(statusColor.opacity(0.12), in: Capsule())
+    }
+
+    private var statusColor: Color {
+        switch servo.status {
+        case .idle:    return .secondary
+        case .running: return .green
+        case .halted:  return .red
+        }
+    }
+
+    private var statusLabel: String {
+        switch servo.status {
+        case .idle:    return "Idle"
+        case .running: return "Running"
+        case .halted:  return "Halted — Collision"
+        }
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Speed  \(String(format: "%.1f×", servo.speedScale))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(value: $servo.speedScale, in: 0.1...2.0)
+                    .frame(width: 130)
+            }
+            Spacer()
+            actionButtons
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        switch servo.status {
+        case .idle:
+            Button("Start") { servo.start(appState: appState) }
+                .buttonStyle(.borderedProminent)
+                .disabled(!appState.isRobotLoaded)
+        case .running:
+            Button("Stop", role: .destructive) { servo.stop() }
+                .buttonStyle(.bordered)
+        case .halted:
+            HStack(spacing: 8) {
+                Button("Resume") { servo.resume() }
+                    .buttonStyle(.bordered)
+                Button("Stop", role: .destructive) { servo.stop() }
+                    .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    // MARK: - Joint Controls
+
+    private var jointControls: some View {
+        Group {
+            if let model = appState.robotModel {
+                let names = model.orderedActuatedJointNames
+                // TimelineView forces a 20 Hz re-read of appState.jointAngles
+                // (jointAngles is not @Published, so this is the refresh mechanism).
+                TimelineView(.periodic(from: .now, by: 0.05)) { _ in
+                    List {
+                        ForEach(names, id: \.self) { name in
+                            JointJogRow(
+                                name:      name,
+                                angleDeg:  (appState.jointAngles[name] ?? 0) * 180 / .pi,
+                                isRunning: servo.status == .running,
+                                onPress:   { dir in servo.setJoint(name, direction: dir) },
+                                onRelease: { servo.setJoint(name, direction: 0) }
+                            )
+                        }
+                    }
+                    .listStyle(.inset)
+                }
+            } else {
+                ContentUnavailableView("No Robot Loaded", systemImage: "gearshape.2")
+            }
+        }
+    }
+
+    // MARK: - Cartesian Controls
+
+    private var cartesianControls: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 8) {
+                Text("Translation (World Frame)")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    CartesianJogPair(label: "X", labelColor: .red,   axisIndex: 0, servo: servo)
+                    CartesianJogPair(label: "Y", labelColor: .green, axisIndex: 1, servo: servo)
+                    CartesianJogPair(label: "Z", labelColor: .blue,  axisIndex: 2, servo: servo)
+                }
+            }
+
+            VStack(spacing: 8) {
+                Text("Rotation (World Frame)")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    CartesianJogPair(label: "Rx", labelColor: .red,   axisIndex: 3, servo: servo)
+                    CartesianJogPair(label: "Ry", labelColor: .green, axisIndex: 4, servo: servo)
+                    CartesianJogPair(label: "Rz", labelColor: .blue,  axisIndex: 5, servo: servo)
+                }
+            }
+
+            if appState.robotSetup.activeGroup == nil {
+                Label(
+                    "Set an active planning group in Setup Assistant for accurate Cartesian jogging.",
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 14)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+    }
+}
+
+// MARK: - Joint Jog Row
+
+private struct JointJogRow: View {
+    let name:      String
+    let angleDeg:  Double
+    let isRunning: Bool
+    let onPress:   (Double) -> Void
+    let onRelease: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(name)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(String(format: "%.1f°", angleDeg))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 52, alignment: .trailing)
+            HoldButton(systemImage: "minus") { onPress(-1) } onRelease: { onRelease() }
+                .disabled(!isRunning)
+            HoldButton(systemImage: "plus")  { onPress(+1) } onRelease: { onRelease() }
+                .disabled(!isRunning)
+        }
+        .padding(.vertical, 1)
+    }
+}
+
+// MARK: - Cartesian Jog Pair
+
+private struct CartesianJogPair: View {
+    let label:      String
+    let labelColor: Color
+    let axisIndex:  Int
+    @ObservedObject var servo: ServoEngine
+
+    private var isRunning: Bool { servo.status == .running }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(labelColor)
+            HoldButton(systemImage: "arrow.up") {
+                servo.setCartesian(axis: axisIndex, direction: +1)
+            } onRelease: {
+                servo.setCartesian(axis: axisIndex, direction: 0)
+            }
+            .disabled(!isRunning)
+            HoldButton(systemImage: "arrow.down") {
+                servo.setCartesian(axis: axisIndex, direction: -1)
+            } onRelease: {
+                servo.setCartesian(axis: axisIndex, direction: 0)
+            }
+            .disabled(!isRunning)
+        }
+        .frame(width: 60)
+    }
+}
+
+// MARK: - Hold Button
+
+/// Calls `onPress()` on mouse-down and `onRelease()` on mouse-up.
+/// Uses a zero-distance DragGesture so it fires immediately without
+/// requiring movement, while still releasing cleanly on mouse-up.
+private struct HoldButton: View {
+    let systemImage: String
+    let onPress:     () -> Void
+    let onRelease:   () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 13, weight: .semibold))
+            .frame(width: 28, height: 26)
+            .background(
+                isPressed ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.1),
+                in: RoundedRectangle(cornerRadius: 5)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 5))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if !isPressed {
+                            isPressed = true
+                            onPress()
+                        }
+                    }
+                    .onEnded { _ in
+                        isPressed = false
+                        onRelease()
+                    }
+            )
+    }
+}
