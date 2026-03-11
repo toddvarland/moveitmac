@@ -404,48 +404,6 @@ struct RobotSceneView: NSViewRepresentable {
             root.addChildNode(axisShaft(color: .green, axis: 1))
             root.addChildNode(axisShaft(color: .blue,  axis: 2))
 
-            // Render each label letter into an NSImage and apply it to a flat plane.
-            // SCNText with extrusionDepth:0 is depth-clipped; NSImage texture is reliable.
-            let tipDist = Float(length) + Float(radius) * 6   // just past the cone tip
-            let planeSize: CGFloat = 0.04                      // 4 cm world square
-            let imgSize = 128
-
-            func labelImage(letter: String, color: NSColor) -> NSImage {
-                let img = NSImage(size: NSSize(width: imgSize, height: imgSize))
-                img.lockFocus()
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: NSFont.boldSystemFont(ofSize: CGFloat(imgSize) * 0.72),
-                    .foregroundColor: color
-                ]
-                let s    = letter as NSString
-                let sz   = s.size(withAttributes: attrs)
-                let pt   = NSPoint(x: (CGFloat(imgSize) - sz.width)  / 2,
-                                   y: (CGFloat(imgSize) - sz.height) / 2)
-                s.draw(at: pt, withAttributes: attrs)
-                img.unlockFocus()
-                return img
-            }
-
-            let labelInfos: [(String, NSColor, SCNVector3)] = [
-                ("X", .red,   SCNVector3(tipDist,  0,       0)),
-                ("Y", .green, SCNVector3(0,        tipDist, 0)),
-                ("Z", .blue,  SCNVector3(0,        0,       tipDist))
-            ]
-            for (letter, color, pos) in labelInfos {
-                let plane = SCNPlane(width: planeSize, height: planeSize)
-                plane.firstMaterial?.diffuse.contents = labelImage(letter: letter, color: color)
-                plane.firstMaterial?.isDoubleSided    = true
-                plane.firstMaterial?.blendMode        = .alpha
-                plane.firstMaterial?.writesToDepthBuffer = false
-
-                let node = SCNNode(geometry: plane)
-                node.position = pos
-                let bb = SCNBillboardConstraint()
-                bb.freeAxes = .all
-                node.constraints = [bb]
-                root.addChildNode(node)
-            }
-
             scene.rootNode.addChildNode(root)
             gizmoNode = root
             root.isHidden = true
