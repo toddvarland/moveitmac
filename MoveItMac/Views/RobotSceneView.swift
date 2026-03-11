@@ -376,13 +376,11 @@ struct RobotSceneView: NSViewRepresentable {
             let radius: CGFloat = 0.008
 
             func axisShaft(color: NSColor, axis: Int) -> SCNNode {
-                // Shaft
                 let cyl = SCNCylinder(radius: radius, height: length)
                 cyl.firstMaterial?.diffuse.contents = color
                 cyl.firstMaterial?.emission.contents = color.withAlphaComponent(0.5)
                 let shaft = SCNNode(geometry: cyl)
 
-                // Cone tip
                 let cone = SCNCone(topRadius: 0, bottomRadius: radius * 2.5, height: radius * 5)
                 cone.firstMaterial?.diffuse.contents = color
                 cone.firstMaterial?.emission.contents = color.withAlphaComponent(0.5)
@@ -393,8 +391,8 @@ struct RobotSceneView: NSViewRepresentable {
                 let wrapper = SCNNode()
                 wrapper.name = "gizmo:\(axis)"
                 switch axis {
-                case 0: wrapper.eulerAngles = SCNVector3(0, 0, -Float.pi / 2)  // X
-                case 2: wrapper.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)   // Z
+                case 0: wrapper.eulerAngles = SCNVector3(0, 0, -Float.pi / 2)
+                case 2: wrapper.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
                 default: break
                 }
                 shaft.position = SCNVector3(0, Float(length / 2), 0)
@@ -406,35 +404,46 @@ struct RobotSceneView: NSViewRepresentable {
             root.addChildNode(axisShaft(color: .green, axis: 1))
             root.addChildNode(axisShaft(color: .blue,  axis: 2))
 
-            // Labels attached directly to root (not to rotated wrappers) so the
-            // SCNBillboardConstraint has an unambiguous world-space reference frame.
-            // Tip positions in root-local space:
-            //   X wrapper: eulerAngles(0,0,-π/2) maps wrapper-Y → root-X+
-            //   Y wrapper: no rotation            maps wrapper-Y → root-Y+
-            //   Z wrapper: eulerAngles(π/2,0,0)  maps wrapper-Y → root-Z+
-            let tipDist = Float(length) + Float(radius) * 5   // ≈ 0.16 m past origin
-            let labelScale: Float = 0.003                      // 10 pt × 0.003 ≈ 3 cm
-            let labelInfos: [(String, NSColor, SCNVector3)] = [
-                ("X", .red,   SCNVector3(tipDist,  0,        0)),
-                ("Y", .green, SCNVector3(0,         tipDist,  0)),
-                ("Z", .blue,  SCNVector3(0,         0,        tipDist))
-            ]
-            for (str, color, pos) in labelInfos {
-                let text = SCNText(string: str, extrusionDepth: 0)
-                text.font = NSFont.boldSystemFont(ofSize: 10)
-                text.flatness = 0.1
-                text.firstMaterial?.diffuse.contents = color
-                text.firstMaterial?.emission.contents = color
-                text.firstMaterial?.isDoubleSided = true
+            // Render each label letter into an NSImage and apply it to a flat plane.
+            // SCNText with extrusionDepth:0 is depth-clipped; NSImage texture is reliable.
+            let tipDist = Float(length) + Float(radius) * 6   // just past the cone tip
+            let planeSize: CGFloat = 0.04                      // 4 cm world square
+            let imgSize = 128
 
-                let labelNode = SCNNode(geometry: text)
-                labelNode.scale = SCNVector3(labelScale, labelScale, labelScale)
-                // Shift left by ~half a glyph width to visually centre the letter.
-                labelNode.position = SCNVector3(pos.x - 0.012, pos.y, pos.z)
+            func labelImage(letter: String, color: NSColor) -> NSImage {
+                let img = NSImage(size: NSSize(width: imgSize, height: imgSize))
+                img.lockFocus()
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.boldSystemFont(ofSize: CGFloat(imgSize) * 0.72),
+                    .foregroundColor: color
+                ]
+                let s    = letter as NSString
+                let sz   = s.size(withAttributes: attrs)
+                let pt   = NSPoint(x: (CGFloat(imgSize) - sz.width)  / 2,
+                                   y: (CGFloat(imgSize) - sz.height) / 2)
+                s.draw(at: pt, withAttributes: attrs)
+                img.unlockFocus()
+                return img
+            }
+
+            let labelInfos: [(String, NSColor, SCNVector3)] = [
+                ("X", .red,   SCNVector3(tipDist,  0,       0)),
+                ("Y", .green, SCNVector3(0,        tipDist, 0)),
+                ("Z", .blue,  SCNVector3(0,        0,       tipDist))
+            ]
+            for (letter, color, pos) in labelInfos {
+                let plane = SCNPlane(width: planeSize, height: planeSize)
+                plane.firstMaterial?.diffuse.contents = labelImage(letter: letter, color: color)
+                plane.firstMaterial?.isDoubleSided    = true
+                plane.firstMaterial?.blendMode        = .alpha
+                plane.firstMaterial?.writesToDepthBuffer = false
+
+                let node = SCNNode(geometry: plane)
+                node.position = pos
                 let bb = SCNBillboardConstraint()
                 bb.freeAxes = .all
-                labelNode.constraints = [bb]
-                root.addChildNode(labelNode)
+                node.constraints = [bb]
+                root.addChildNode(node)
             }
 
             scene.rootNode.addChildNode(root)
