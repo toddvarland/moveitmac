@@ -99,12 +99,13 @@ moveit-clone/
 
 ### 2. Serial Connection
 - Connect the myCobot 280-M5 via USB
-- Select `/dev/cu.usbserial-52D20281481` in the connection picker and connect
+- Select the port (e.g. `/dev/cu.usbserial-XXXXXXXX`) in the connection picker and connect
 - Confirm the button toggles to **Disconnect**
+- Press **Start** to activate the servo engine — jogging is not possible until Start is pressed
 
 ### 3. Physical → Virtual Mirroring
-- With the arm connected and idle, physically move the arm (or jog from the physical controller)
-- Confirm the virtual arm in the 3D view updates in real time (~5 Hz)
+- With the arm connected and the servo engine started, jog a joint using the +/− buttons
+- Release — confirm the virtual arm in the 3D view reflects the new position (~5 Hz poll)
 
 ### 4. Jogging
 - In Servo Control Panel, hold a +/− jog button for a joint
@@ -113,7 +114,7 @@ moveit-clone/
 
 ### 5. Zero Pose
 - Press **Zero Pose**
-- Physical arm moves to all-zeros (straight up); virtual arm follows
+- Physical arm moves to 0° on all joints (home/calibration position); virtual arm follows
 
 ### 6. Trajectory Planning
 - Press **Set Start** — captures current joint angles as the start pose

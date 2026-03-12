@@ -80,10 +80,11 @@ public enum TimeParameterization {
         let joints = model.orderedActuatedJointNames
 
         // Build per-joint limits.
+        // Note: URDF convention allows velocity="0" to mean "unspecified/unlimited".
+        // Treat zero (or missing) limits as 1.0 rad/s to avoid astronomically long durations.
         let vMax: [String: Double] = Dictionary(uniqueKeysWithValues: joints.map { name in
-            let v = maxVelocity
-                ?? model.joints[name]?.limits?.velocity
-                ?? 1.0
+            let urdfV = model.joints[name]?.limits?.velocity ?? 0
+            let v = maxVelocity ?? (urdfV > 0 ? urdfV : 1.0)
             return (name, max(v, 1e-9))
         })
         let aMax: [String: Double] = Dictionary(uniqueKeysWithValues: joints.map { name in

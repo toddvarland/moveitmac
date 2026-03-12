@@ -102,11 +102,19 @@ final class MyCobotBridge: ObservableObject {
 
     // MARK: - Send angles
 
+    // Joint sign corrections: some joints have inverted angle convention between
+    // the URDF coordinate frame and the myCobot 280-M5 firmware.
+    // +1 = same sign, -1 = inverted.  Determined empirically by jogging each joint
+    // and comparing virtual-arm direction with physical-arm direction.
+    // J4 (joint5_to_joint4, index 3) is mechanically inverted relative to URDF +Z.
+    private static let jointSignCorrection: [Double] = [1, 1, 1, -1, 1, 1]
+
     /// Send a single joint to a target angle (radians) at the given speed.
     func sendAngle(jointIndex: Int, radians: Double, robotSpeed: Int) {
         guard isConnected else { return }
         let spd = UInt8(robotSpeed.clamped(to: 1 ... 100))
-        let deg = radians * (180.0 / .pi)
+        let sign = jointIndex < Self.jointSignCorrection.count ? Self.jointSignCorrection[jointIndex] : 1.0
+        let deg = radians * sign * (180.0 / .pi)
         let raw = Int((deg * 100).rounded()).clamped(to: Int(Int16.min) ... Int(Int16.max))
         let encoded = raw >= 0 ? raw : raw + 65536
         let params: [UInt8] = [UInt8(jointIndex + 1), UInt8(encoded >> 8), UInt8(encoded & 0xFF), spd]
@@ -124,7 +132,8 @@ final class MyCobotBridge: ObservableObject {
         let spd = UInt8(robotSpeed.clamped(to: 1 ... 100))
         var frames: [[UInt8]] = []
         for i in 0 ..< 6 {
-            let deg = radians[i] * (180.0 / .pi)
+            let sign = i < Self.jointSignCorrection.count ? Self.jointSignCorrection[i] : 1.0
+            let deg = radians[i] * sign * (180.0 / .pi)
             let raw = Int((deg * 100).rounded()).clamped(to: Int(Int16.min) ... Int(Int16.max))
             let encoded = raw >= 0 ? raw : raw + 65536
             frames.append(buildFrame(cmd: 0x21, params: [UInt8(i + 1), UInt8(encoded >> 8), UInt8(encoded & 0xFF), spd]))
@@ -184,7 +193,9 @@ final class MyCobotBridge: ObservableObject {
                     let lo  = UInt16(data[i + 5 + j * 2])
                     let raw = Int16(bitPattern: (hi << 8) | lo)
                     // Protocol units: 0.01 °; convert to radians for URDF.
-                    angles.append(Double(raw) / 100.0 * .pi / 180.0)
+                    // Apply sign correction to match URDF joint convention.
+                    let sign = j < MyCobotBridge.jointSignCorrection.count ? MyCobotBridge.jointSignCorrection[j] : 1.0
+                    angles.append(Double(raw) / 100.0 * .pi / 180.0 * sign)
                 }
                 DispatchQueue.main.async { completion(angles) }
                 return

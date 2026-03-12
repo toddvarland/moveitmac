@@ -353,3 +353,26 @@ Run the 10 UR5e acceptance tests before calling planning "done":
 10. IK-dragged goal → plan → execute animation end-to-end
 
 All 10 must succeed before Step 7 is closed.
+
+---
+
+## 9. Future Considerations
+
+Features deferred beyond the current build phases, ordered by student-facing impact.
+
+### Near-Term — Polish & Reliability
+
+1. **Trajectory cache** — Save and reload planned trajectories to SQLite so students can replay without replanning. Key by robot + scene hash.
+2. **Named poses** — Let users save/name poses (e.g. "home", "ready") and recall them by button. Store in a companion SRDF or local JSON file.
+3. **Planning scene obstacle UI** — Drag-to-place box/cylinder/sphere primitives directly in the 3D view. Already planned in V1 scoping (Q7) but not yet implemented.
+
+### Medium-Term — Student Experience
+
+4. **Task Constructor basics** — Chain multiple plan segments (move to A → B → home) as a simple ordered sequence with per-segment status.
+5. **Pilz LIN/PTP** — Straight-line Cartesian paths and clean joint-space point-to-point moves. Currently only RRT is available, which takes random indirect paths.
+6. **Trajectory export** — Export planned trajectories to JSON/CSV so students can analyze or replay them in external tools (Python, MATLAB, etc.).
+
+### Longer-Term — Advanced Capabilities
+
+7. **Setup Assistant completion** — Named poses configuration step, controller config step, full SRDF export.
+8. **End-effector drag IK** — Set goal pose by dragging the EE handle in the 3D view rather than using joint sliders. Requires KDL bridge + SceneKit gesture recognizer.

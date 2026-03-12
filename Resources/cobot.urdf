@@ -170,7 +170,7 @@
 
 
   <joint name="joint5_to_joint4" type="revolute">
-    <axis xyz=" 0 0 1"/>
+    <axis xyz="0 0 1"/>
     <limit effort = "1000.0" lower = "-2.6179" upper = "2.6179" velocity = "0"/>
     <parent link="joint4"/>
     <child link="joint5"/>
