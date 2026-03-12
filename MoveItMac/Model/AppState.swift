@@ -356,6 +356,12 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Reload the URDF from the last opened URL (picks up on-disk edits without re-selecting the file).
+    func reloadURDF() {
+        guard let url = urdfURL else { return }
+        loadURDF(from: url)
+    }
+
     // MARK: - Private
 
     private func setRobotModel(_ model: RobotModel) {

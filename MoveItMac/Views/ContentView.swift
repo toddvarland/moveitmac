@@ -31,6 +31,13 @@ struct ContentView: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
+                Button("Reload URDF", systemImage: "arrow.clockwise") {
+                    appState.reloadURDF()
+                }
+                .disabled(appState.urdfURL == nil)
+                .help("Reload the URDF from disk (picks up edits without re-opening the file)")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Setup Assistant", systemImage: "slider.horizontal.3") {
                     showSetupAssistant = true
                 }

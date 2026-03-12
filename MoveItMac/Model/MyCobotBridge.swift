@@ -106,8 +106,8 @@ final class MyCobotBridge: ObservableObject {
     // the URDF coordinate frame and the myCobot 280-M5 firmware.
     // +1 = same sign, -1 = inverted.  Determined empirically by jogging each joint
     // and comparing virtual-arm direction with physical-arm direction.
-    // J4 (joint5_to_joint4, index 3) is mechanically inverted relative to URDF +Z.
-    private static let jointSignCorrection: [Double] = [1, 1, 1, -1, 1, 1]
+    // J4 axis is defined as 0 0 -1 in the URDF, so no additional bridge flip needed.
+    private static let jointSignCorrection: [Double] = [1, 1, 1, 1, 1, 1]
 
     /// Send a single joint to a target angle (radians) at the given speed.
     func sendAngle(jointIndex: Int, radians: Double, robotSpeed: Int) {
