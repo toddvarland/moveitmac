@@ -76,6 +76,10 @@ final class AppState: ObservableObject {
     }
 
     /// Lower/upper limits for each joint (radians or metres).
+    /// Physical center pose captured from the arm's mechanical centering marks.
+    /// Nil until the user captures it with "Capture from Arm".
+    @Published var centerAngles: [String: Double]? = nil
+
     var jointLimits: [String: ClosedRange<Double>] {
         guard let model = robotModel else { return [:] }
         return model.joints.values

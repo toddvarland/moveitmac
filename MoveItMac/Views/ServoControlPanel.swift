@@ -9,8 +9,9 @@ struct ServoControlPanel: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var servo: ServoEngine
 
-    @State private var availablePorts: [String] = []
-    @State private var selectedPort:   String   = ""
+    @State private var availablePorts:    [String] = []
+    @State private var selectedPort:      String   = ""
+    @State private var isCapturingCenter: Bool     = false
 
     /// 5 Hz clock used to read back physical joint angles when idle.
     private let feedbackClock = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
@@ -73,32 +74,95 @@ struct ServoControlPanel: View {
             Divider()
             hardwareRow
             Divider()
-            zeroPoseRow
+            poseActionsRow
         }
         .background(.bar)
     }
 
-    // MARK: - Zero Pose Row
+    // MARK: - Pose Actions Row (Zero / Center)
 
-    private var zeroPoseRow: some View {
-        Button {
-            servo.stop()  // safe to call even if already idle
-            if let model = appState.robotModel {
-                for name in model.orderedActuatedJointNames {
-                    appState.jointAngles[name] = 0
+    private var poseActionsRow: some View {
+        VStack(spacing: 0) {
+            // Row 1: Zero Pose + Go to Center
+            HStack(spacing: 8) {
+                Button {
+                    servo.stop()
+                    if let model = appState.robotModel {
+                        for name in model.orderedActuatedJointNames {
+                            appState.jointAngles[name] = 0
+                        }
+                        servo.angleRevision += 1
+                    }
+                    if servo.bridge.isConnected {
+                        servo.bridge.sendAngles([0, 0, 0, 0, 0, 0], robotSpeed: 50)
+                    }
+                } label: {
+                    Label("Zero Pose", systemImage: "arrow.up.to.line")
+                        .frame(maxWidth: .infinity)
                 }
-                servo.angleRevision += 1
+                .buttonStyle(.bordered)
+
+                Button {
+                    guard let center = appState.centerAngles,
+                          let model  = appState.robotModel else { return }
+                    servo.stop()
+                    appState.jointAngles = center
+                    servo.angleRevision += 1
+                    if servo.bridge.isConnected {
+                        let names  = model.orderedActuatedJointNames
+                        let angles = Array(names.prefix(6).map { center[$0] ?? 0 })
+                        servo.bridge.sendAngles(angles, robotSpeed: 50)
+                    }
+                } label: {
+                    Label("Go to Center", systemImage: "scope")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(appState.centerAngles == nil)
             }
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+
+            // Row 2: Capture Center from Arm (only when connected + idle)
             if servo.bridge.isConnected {
-                servo.bridge.sendAngles([0, 0, 0, 0, 0, 0], robotSpeed: 50)
+                Button {
+                    guard !isCapturingCenter else { return }
+                    isCapturingCenter = true
+                    servo.bridge.pollAngles { angles in
+                        isCapturingCenter = false
+                        guard let angles, let model = appState.robotModel else { return }
+                        let names = model.orderedActuatedJointNames
+                        var captured: [String: Double] = [:]
+                        for (i, name) in names.prefix(6).enumerated() {
+                            captured[name] = angles[i]
+                        }
+                        appState.centerAngles = captured
+                        // Sync virtual arm to the captured pose.
+                        appState.jointAngles = captured
+                        servo.angleRevision += 1
+                    }
+                } label: {
+                    if isCapturingCenter {
+                        Label("Reading\u{2026}", systemImage: "arrow.down.circle")
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label(
+                            appState.centerAngles == nil
+                                ? "Capture Center from Arm"
+                                : "Re-capture Center from Arm",
+                            systemImage: "arrow.down.circle"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .tint(.orange)
+                .disabled(isCapturingCenter || servo.status != .idle)
+                .padding(.horizontal, 14)
+                .padding(.top, 4)
             }
-        } label: {
-            Label("Zero Pose", systemImage: "arrow.up.to.line")
-                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        .padding(.bottom, 6)
         .background(.bar)
     }
 
