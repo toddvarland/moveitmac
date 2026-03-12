@@ -11,7 +11,6 @@ struct ServoControlPanel: View {
 
     @State private var availablePorts:    [String] = []
     @State private var selectedPort:      String   = ""
-    @State private var isCapturingCenter: Bool     = false
 
     /// 5 Hz clock used to read back physical joint angles when idle.
     private let feedbackClock = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
@@ -123,41 +122,30 @@ struct ServoControlPanel: View {
             .padding(.horizontal, 14)
             .padding(.top, 6)
 
-            // Row 2: Capture Center from Arm (only when connected + idle)
+            // Row 2: Capture Center from Arm (connected + idle only).
+            // Snapshots appState.jointAngles which the feedbackClock keeps live
+            // at 5 Hz — no extra serial poll needed, no race condition.
             if servo.bridge.isConnected {
                 Button {
-                    guard !isCapturingCenter else { return }
-                    isCapturingCenter = true
-                    servo.bridge.pollAngles { angles in
-                        isCapturingCenter = false
-                        guard let angles, let model = appState.robotModel else { return }
-                        let names = model.orderedActuatedJointNames
-                        var captured: [String: Double] = [:]
-                        for (i, name) in names.prefix(6).enumerated() {
-                            captured[name] = angles[i]
-                        }
-                        appState.centerAngles = captured
-                        // Sync virtual arm to the captured pose.
-                        appState.jointAngles = captured
-                        servo.angleRevision += 1
+                    guard let model = appState.robotModel else { return }
+                    var captured: [String: Double] = [:]
+                    for name in model.orderedActuatedJointNames.prefix(6) {
+                        captured[name] = appState.jointAngles[name] ?? 0
                     }
+                    appState.centerAngles = captured
+                    // Virtual arm is already showing this pose via feedbackClock.
                 } label: {
-                    if isCapturingCenter {
-                        Label("Reading\u{2026}", systemImage: "arrow.down.circle")
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Label(
-                            appState.centerAngles == nil
-                                ? "Capture Center from Arm"
-                                : "Re-capture Center from Arm",
-                            systemImage: "arrow.down.circle"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
+                    Label(
+                        appState.centerAngles == nil
+                            ? "Capture Center from Arm"
+                            : "Re-capture Center from Arm",
+                        systemImage: "scope.fill"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(.orange)
-                .disabled(isCapturingCenter || servo.status != .idle)
+                .disabled(servo.status != .idle)
                 .padding(.horizontal, 14)
                 .padding(.top, 4)
             }
